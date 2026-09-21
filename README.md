@@ -1,3 +1,15 @@
+# VinoVeritas — Programma dei 10 Agenti
+
+Il progetto del sistema di onboarding a dieci agenti è in
+**[`docs/vinoveritas/`](./docs/vinoveritas/README.md)**: architettura, modello
+del fascicolo versionato, contratto dei dieci agenti, flussi operativi e piano
+di realizzazione.
+
+Il contratto delle fondamenta comuni è ancorato nel codice in
+[`src/worker/dossier/`](./src/worker/dossier/).
+
+---
+
 # React + Vite + Hono + Cloudflare Workers
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/vite-react-template)

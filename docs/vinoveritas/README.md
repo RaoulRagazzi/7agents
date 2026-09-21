@@ -1,0 +1,54 @@
+# VinoVeritas — Programma dei 10 Agenti
+
+Progetto di un sistema che accompagna la cantina dall'inserimento dei primi
+materiali fino all'attivazione verificata dei servizi.
+
+**Obiettivo operativo:** raccogliere una volta le informazioni, verificarle,
+chiedere soltanto le integrazioni necessarie e riutilizzare i dati approvati per
+profilo, referenze, Sommelier e materiali commerciali.
+
+> Questo è il programma progettuale della squadra. L'attivazione operativa
+> richiede l'integrazione con le funzionalità già presenti in VinoVeritas:
+> nessun documento di questa cartella autorizza scritture dirette sui dati di
+> produzione, e **la e-label mantiene il proprio percorso separato**.
+
+## Indice
+
+| # | Documento | Contenuto |
+|---|-----------|-----------|
+| 00 | [Sintesi e decisioni](./00-sintesi.md) | La tesi del progetto, le sei decisioni strutturali, cosa cambia rispetto a un onboarding classico |
+| 01 | [Architettura](./01-architettura.md) | I cinque piani del sistema, le piattaforme scelte, le alternative scartate e perché |
+| 02 | [Il fascicolo](./02-fascicolo.md) | Modello dati, ciclo di vita del fatto, ambiti, provenienza, invalidazione selettiva |
+| 03 | [I dieci agenti](./03-agenti.md) | Contratto di ciascun agente: ambito, strumenti, schema, modello, guardrail |
+| 04 | [Flussi operativi](./04-flussi.md) | Percorso end-to-end, cancelli, ciclo delle domande, attivazione idempotente, ripresa |
+| 05 | [Piano di realizzazione](./05-piano.md) | I dodici passi, le sei tranche, casi di prova, indicatori, costi |
+
+## Ancoraggio nel codice
+
+Il contratto delle fondamenta comuni (Tranche 2) non vive solo come prosa:
+
+- [`src/worker/dossier/types.ts`](../../src/worker/dossier/types.ts) — tipi del fascicolo: ambito, fatto, provenienza, anomalia, operazione di attivazione
+- [`src/worker/dossier/gates.ts`](../../src/worker/dossier/gates.ts) — cancelli dichiarativi e valutatore puro: il "via libera" è una funzione, non una frase del modello
+- [`src/worker/dossier/assignment.ts`](../../src/worker/dossier/assignment.ts) — regola deterministica di assegnazione fra agente 4 e agente 5
+
+## Le tre invarianti
+
+Tutto il resto del progetto discende da queste. Se una di esse cade, il sistema
+non è più affidabile:
+
+1. **Nessun dato senza provenienza.** Ogni valore nel fascicolo porta con sé da
+   dove viene: documento e pagina, dichiarazione e interlocutore, pagina
+   pubblica e data di lettura, oppure derivazione da altri fatti.
+2. **Nessuna attivazione senza approvazione.** Il livello di attivazione legge
+   esclusivamente fatti in stato *approvato*. Un dato proposto non raggiunge mai
+   il profilo pubblico, il Sommelier o i materiali commerciali.
+3. **Nessuna domanda già risposta.** Prima di rivolgersi al produttore il
+   sistema verifica di non conoscere già la risposta — inclusa la risposta
+   "non disponibile", che è essa stessa un dato approvato.
+
+A queste se ne aggiunge una quarta, di natura difensiva:
+
+4. **Nessuna scrittura fuori ambito.** Un agente può scrivere soltanto negli
+   ambiti che gli sono stati concessi. Una caratteristica del territorio non può
+   diventare una caratteristica del vigneto per errore di prompt: glielo impedisce
+   lo schema, non l'istruzione.
