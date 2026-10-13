@@ -33,8 +33,10 @@ prendere decisioni sbagliate.
 | Accesso al fascicolo con `cantina_id` imposto in un unico punto | ✅ | [`src/worker/dossier/repository.ts`](../../src/worker/dossier/repository.ts) |
 | Pacchetto di contenuti per il Sommelier, filtrato per visibilità | ✅ | [`src/worker/dossier/pack.ts`](../../src/worker/dossier/pack.ts) |
 | Test di isolamento fra cantine | ✅ **criterio di completamento della Tranche 2 soddisfatto** | [`__tests__/isolation.test.ts`](../../src/worker/dossier/__tests__/isolation.test.ts) |
-| Ontologia enologica versionata in KV | ⬜ | — |
-| Kernel d'agente (invocazione, budget, registrazione su `agent_run`) | ⬜ | — |
+| Ontologia enologica come dato versionato | ✅ seme e forma, reso deterministico per la cache; il caricamento da KV resta da fare | [`src/worker/dossier/ontology.ts`](../../src/worker/dossier/ontology.ts) |
+| Kernel d'agente: prefisso stabile, budget, tentativi, registrazione | ✅ | [`src/worker/dossier/kernel.ts`](../../src/worker/dossier/kernel.ts) |
+| Porta verso il modello e contabilità del costo | ✅ | [`src/worker/dossier/model.ts`](../../src/worker/dossier/model.ts) |
+| Adattatore verso l'API Claude | 🟡 scritto e verificato dai tipi dell'SDK, **mai eseguito** | [`src/worker/dossier/anthropic.ts`](../../src/worker/dossier/anthropic.ts) |
 
 ## Tranche 3-6
 
@@ -44,7 +46,7 @@ anticorruzione verso VinoVeritas, pilota.
 
 ## Cosa i test verificano oggi
 
-181 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
+218 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
 il type stripping nativo esegue i `.ts` direttamente e `node:sqlite` fornisce il
 motore: i test del repository girano sullo stesso SQL e sugli stessi vincoli che
 agiranno su D1, non su un simulacro).
@@ -70,6 +72,10 @@ agiranno su D1, non su un simulacro).
 | **Fonti contraddittorie** | Il caso del programma (scheda 13,5 contro listino 14) apre una contraddizione con entrambe le evidenze e **nessun vincitore**; la tolleranza di un decimo sulla gradazione tiene; "D.O.C." e "DOC" sono la stessa denominazione; una divergenza a livello più basso non apre una contraddizione |
 | **Pacchetto** | Nessun fatto `riservato` o `interno` entra in alcun pacchetto, per nessuna destinazione; il Sommelier è la destinazione più restrittiva; un `non_disponibile` non diventa contenuto; ogni fatto scartato è contato in esattamente una categoria |
 | **Catena completa** | Dal primo materiale al via libera: il profilo si apre solo a dati completi e si richiude su un'anomalia sopravvenuta; una referenza percorre assegnazione → risoluzione candidati → proposta → approvazione → cancello → pacchetto → chiave d'operazione → quattro stati → verifica; una nuova versione richiude il cancello finché non è approvata e cambia la chiave d'operazione; un'istruzione ostile in un PDF non cambia i permessi, e il tentativo compare nel registro |
+| **Costo** | Le tre voci (ingresso, uscita, cache) sono disgiunte e tariffate separatamente; la lettura dalla cache costa un decimo dell'ingresso e la scrittura 1,25 volte, verificato sul listino; un modello senza tariffe è un errore e non un costo zero; la spesa si somma per cantina e non attraversa il confine |
+| **Prefisso stabile** | Due compiti del tutto diversi producono un prefisso **identico byte per byte**; il punto di interruzione della cache sta sull'ultimo blocco stabile e solo lì; nessun orario, data con orario o UUID compare nel prefisso; l'ordine degli ambiti non lo cambia; l'ontologia sta nel prefisso e non nella parte variabile |
+| **Budget** | Una singola chiamata troppo lunga viene **interrotta** (il segnale raggiunge la richiesta in volo, verificato); la durata residua si riduce fra i tentativi e si esaurisce; tre tentativi dentro il limite di costo possono superarlo insieme, e il controllo lo rileva; il tetto della cantina blocca prima di spendere |
+| **Kernel** | Un compito fuori dagli ambiti leggibili non spende alcuna chiamata; una proposta citata diventa provenienza documentale e si approva, una senza citazioni resta `inferenza_modello` e **non** si approva; una proposta fuori ambito è respinta e contata senza fermare le altre; un errore non ritentabile si ferma al primo tentativo, un rifiuto del modello non si ritenta identico; ogni esecuzione è registrata su `agent_run` qualunque sia l'esito, perché un indicatore che conta solo i successi mente |
 | **Schema** | La migrazione si applica su un motore SQLite reale e i suoi vincoli mordono: `fact_live` respinge un secondo fatto vivo sulla stessa chiave e si libera dopo il superamento; un fatto approvato senza approvatore è respinto; una provenienza documentale senza pagina è respinta; lo stesso sha256 nella stessa cantina non genera due fonti ma in un'altra cantina sì; la stessa chiave d'operazione è respinta; il limite di due cicli e le quattro categorie di gravità sono imposti dal database |
 
 ## Cosa i test **non** verificano
@@ -91,6 +97,16 @@ Perché non c'è ancora nulla da verificare, non perché sia stato trascurato:
 - Nessuna concorrenza reale: la serializzazione delle scritture per cantina è
   affidata al Durable Object, che non esiste ancora. I test di isolamento
   provano la separazione dei dati, non l'assenza di corse.
+- **Nessuna chiamata reale all'API è mai stata eseguita.** L'adattatore è
+  scritto e i suoi tipi combaciano con quelli dell'SDK installato — che è una
+  verifica reale della forma della richiesta, non una congettura — ma nessuna
+  risposta vera lo ha mai attraversato. Quindi restano non misurati: la qualità
+  dell'estrazione, il tasso di riuso della cache, il costo effettivo, il
+  comportamento di `task_budget` e delle citazioni sul campo. Le stime in
+  [05 §5](./05-piano.md#5-costo-ordine-di-grandezza) restano stime, e la prima
+  chiamata reale è il prossimo passo che le sostituisce con numeri.
+- L'ontologia è un seme di cinque denominazioni, non il catalogo completo, e non
+  viene ancora caricata da KV.
 - Nessuna integrazione con VinoVeritas: il livello anticorruzione non esiste, e
   la Tranche 1 deve ancora accertare se le scritture esposte sono idempotenti.
 - Nessuna prova di isolamento fra cantine, che è il criterio di completamento

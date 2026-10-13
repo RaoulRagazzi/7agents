@@ -110,6 +110,20 @@ all'agente un tetto di token di cui è consapevole (si conclude con ordine invec
 di essere troncato), e i messaggi di sistema a metà conversazione come canale
 dell'operatore resistente all'iniezione di istruzioni.
 
+#### Un vincolo dell'API che cambia il progetto
+
+Le citazioni sui documenti e `output_config.format` **non si possono usare
+insieme**: l'API restituisce 400. E le citazioni non sono negoziabili — la
+provenienza con pagina e intervallo è un requisito del fascicolo.
+
+La conseguenza è che l'uscita strutturata di ogni agente **non** è un formato di
+risposta ma uno **strumento con `strict: true`**, che garantisce argomenti
+conformi allo schema e convive con le citazioni. È anche più coerente col resto
+dell'impostazione: `proponi_fatto` è già uno strumento del catalogo, non un
+formato. Lo strumento si invoca con `tool_choice: auto` più un'istruzione
+esplicita, invece di forzarlo: i modelli più recenti rifiutano `tool_choice`
+forzato.
+
 ### Alternative valutate e scartate
 
 | Alternativa | Perché no |

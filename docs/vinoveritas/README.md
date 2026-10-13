@@ -36,13 +36,17 @@ Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
 - [`src/worker/dossier/repository.ts`](../../src/worker/dossier/repository.ts) — il fascicolo di **una** cantina: `cantina_id` imposto in un unico punto, e nessun metodo che lo accetti come argomento
 - [`src/worker/dossier/candidates.ts`](../../src/worker/dossier/candidates.ts) — risoluzione delle fonti contraddittorie per tabella di precedenza
 - [`src/worker/dossier/pack.ts`](../../src/worker/dossier/pack.ts) — il pacchetto per il Sommelier: il punto in cui il confine di visibilità viene tracciato
+- [`src/worker/dossier/kernel.ts`](../../src/worker/dossier/kernel.ts) — il kernel d'agente: prefisso stabile per la cache, budget di durata/costo/tentativi, registrazione di ogni esecuzione
+- [`src/worker/dossier/model.ts`](../../src/worker/dossier/model.ts) — la porta verso il modello e il listino con cui il costo si calcola in un unico punto
+- [`src/worker/dossier/ontology.ts`](../../src/worker/dossier/ontology.ts) — l'ontologia enologica versionata, resa deterministica perché la cache ripaghi
+- [`src/worker/dossier/anthropic.ts`](../../src/worker/dossier/anthropic.ts) — l'unico file che conosce l'SDK
 - [`src/worker/dossier/gates.ts`](../../src/worker/dossier/gates.ts) — cancelli dichiarativi e valutatore puro: il "via libera" è una funzione, non una frase del modello
 - [`src/worker/dossier/invalidation.ts`](../../src/worker/dossier/invalidation.ts) — invalidazione selettiva lungo il grafo delle dipendenze
 - [`src/worker/dossier/activation.ts`](../../src/worker/dossier/activation.ts) — chiave d'operazione idempotente e macchina a stati dell'attivazione
 - [`src/worker/dossier/assignment.ts`](../../src/worker/dossier/assignment.ts) — regola deterministica di assegnazione fra agente 4 e agente 5
 
 ```bash
-npm test        # 181 test, nessuna dipendenza aggiuntiva (Node 22)
+npm test        # 218 test, nessuna dipendenza aggiuntiva (Node 22)
 npx tsc -b      # typecheck
 ```
 
