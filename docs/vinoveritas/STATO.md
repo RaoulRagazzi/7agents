@@ -19,7 +19,7 @@ prendere decisioni sbagliate.
 
 | Componente | Stato | Dove |
 |---|---|---|
-| Schema del fascicolo (D1) | ✅ due migrazioni, provate a catena su SQLite; non ancora applicate su D1 | [`migrations/`](../../migrations/) |
+| Schema del fascicolo (D1) | ✅ tre migrazioni, provate a catena su SQLite; non ancora applicate su D1 | [`migrations/`](../../migrations/) |
 | Tipi del fascicolo: fatto, ambito, provenienza, anomalia | ✅ | [`src/worker/dossier/types.ts`](../../src/worker/dossier/types.ts) |
 | I dieci agenti come dati, con ambiti e strumenti | ✅ | [`src/worker/dossier/agents.ts`](../../src/worker/dossier/agents.ts) |
 | Funzione di ammissione (ambito, provenienza, chiavi riservate) | ✅ | [`src/worker/dossier/admission.ts`](../../src/worker/dossier/admission.ts) |
@@ -50,14 +50,25 @@ prendere decisioni sbagliate.
 | Indicizzazione dei frammenti in Vectorize | ⬜ | — |
 | Agenti 2–5 all'opera su casi di prova reali | ⬜ richiede la prima chiamata reale | — |
 
-## Tranche 4-6
+## Tranche 4 — Controllo e dialogo
 
-Interamente specifica: Sentinella, Ambasciatore, Coordinatore come Workflow,
-Revisore, livello anticorruzione verso VinoVeritas, pilota.
+| Componente | Stato | Dove |
+|---|---|---|
+| Sentinella: controlli deterministici | ✅ 19 controlli, registrati come dati | [`src/worker/dossier/sentinel.ts`](../../src/worker/dossier/sentinel.ts) |
+| Intervalli di plausibilità enologica, con motivazione | ✅ | [`src/worker/dossier/ranges.ts`](../../src/worker/dossier/ranges.ts) |
+| Le anomalie passano nel fascicolo conservando il motivo | ✅ | `repository.ts` → `openFindings` |
+| Sentinella: revisione avversariale del significato | ⬜ richiede il modello | — |
+| Ambasciatore: deduplica, raggruppamento, due cicli | ⬜ | — |
+| Coordinatore come Workflow durevole | ⬜ | — |
+
+## Tranche 5-6
+
+Interamente specifica: Revisore multilingue, livello anticorruzione verso
+VinoVeritas, pilota.
 
 ## Cosa i test verificano oggi
 
-278 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
+381 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
 il type stripping nativo esegue i `.ts` direttamente e `node:sqlite` fornisce il
 motore: i test del repository girano sullo stesso SQL e sugli stessi vincoli che
 agiranno su D1, non su un simulacro).
@@ -87,6 +98,9 @@ agiranno su D1, non su un simulacro).
 | **Prefisso stabile** | Due compiti del tutto diversi producono un prefisso **identico byte per byte**; il punto di interruzione della cache sta sull'ultimo blocco stabile e solo lì; nessun orario, data con orario o UUID compare nel prefisso; l'ordine degli ambiti non lo cambia; l'ontologia sta nel prefisso e non nella parte variabile |
 | **Budget** | Una singola chiamata troppo lunga viene **interrotta** (il segnale raggiunge la richiesta in volo, verificato); la durata residua si riduce fra i tentativi e si esaurisce; tre tentativi dentro il limite di costo possono superarlo insieme, e il controllo lo rileva; il tetto della cantina blocca prima di spendere |
 | **Kernel** | Un compito fuori dagli ambiti leggibili non spende alcuna chiamata; una proposta citata diventa provenienza documentale e si approva, una senza citazioni resta `inferenza_modello` e **non** si approva; una proposta fuori ambito è respinta e contata senza fermare le altre; un errore non ritentabile si ferma al primo tentativo, un rifiuto del modello non si ritenta identico; ogni esecuzione è registrata su `agent_run` qualunque sia l'esito, perché un indicatore che conta solo i successi mente |
+| **Sentinella** | Per **ogni** intervallo: i bordi appartengono all'intervallo, appena fuori è insolito, appena oltre è impossibile. Un valore impossibile è bloccante, uno insolito è da confermare — perché esistono vini così. Una denominazione ignota è un **miglioramento**, non un blocco: l'ontologia è un seme. I vitigni si controllano **solo** se la denominazione è nota, altrimenti l'elenco degli ammessi non è noto. Con l'unità sbagliata il valore non si classifica: una causa, un'anomalia. L'anno corrente arriva dal contesto, non dall'orologio di sistema, e un anno più alto non può aggiungere anomalie |
+| **Sentinella: tenuta su ingressi ostili** | 1.000 fascicoli generati con riferimenti illegali, `NaN`, `Infinity`, stringhe da 5.000 caratteri e byte nulli: nessuna eccezione, nessun codice fuori elenco, nessun motivo vuoto o contenente «undefined», esito deterministico e **indipendente dall'ordine dei fatti in ingresso** |
+| **Coerenza fra le tabelle** | Ogni chiave con un intervallo ha la stessa unità nell'ontologia e viceversa — una chiave con un intervallo ma senza unità dichiarata farebbe classificare un numero senza sapere in che unità è espresso |
 | **Segmentazione** | Ogni offset è esatto (`page.text.slice(charStart, charEnd) === text`, verificato su ogni frammento); nessun frammento supera il massimo né attraversa una pagina; **ogni carattere non bianco di ogni pagina è coperto**; i frammenti si sovrappongono così che il contesto non si perda al taglio; una parola più lunga della finestra viene tagliata invece di bloccare; un testo di 300 paragrafi termina senza girare a vuoto |
 | **Archivio** | Lo stesso contenuto caricato due volte non genera due fonti **né riscrive l'originale**; lo stesso contenuto in due cantine resta separato, con chiavi d'oggetto distinte; un documento altrui non è raggiungibile per id e registrarvi un'estrazione è un errore; un testo illeggibile **non viene segmentato** e si recupera con una nuova estrazione riuscita; un'associazione incerta resta `proposto` con la sua fiducia; i blocchi passati al modello vengono dall'archivio della cantina, quindi un documento di un'altra cantina non può entrare in una richiesta |
 | **Conflitti concorrenti** | Due aggiornamenti concorrenti sullo stesso fatto: il secondo è `CONFLITTO_VERSIONE`, non un'eccezione, e non produce una seconda versione 2; se un altro fatto occupa la chiave la transazione si annulla e il precedente resta vivo alla versione 1 |

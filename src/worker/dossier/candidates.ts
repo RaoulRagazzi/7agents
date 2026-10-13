@@ -72,7 +72,7 @@ export function valuesAgree(
 		}
 		case "testo": {
 			const other = b as Extract<FactValue, { kind: "testo" }>;
-			return normalise(a.text) === normalise(other.text);
+			return normaliseText(a.text) === normaliseText(other.text);
 		}
 		case "data":
 			return a.iso === (b as Extract<FactValue, { kind: "data" }>).iso;
@@ -81,8 +81,8 @@ export function valuesAgree(
 		case "elenco": {
 			const other = b as Extract<FactValue, { kind: "elenco" }>;
 			if (a.items.length !== other.items.length) return false;
-			const left = [...a.items].map(normalise).sort();
-			const right = [...other.items].map(normalise).sort();
+			const left = [...a.items].map(normaliseText).sort();
+			const right = [...other.items].map(normaliseText).sort();
 			return left.every((x, i) => x === right[i]);
 		}
 		case "non_disponibile":
@@ -90,7 +90,14 @@ export function valuesAgree(
 	}
 }
 
-function normalise(text: string): string {
+/**
+ * Normalizzazione del testo per il confronto.
+ *
+ * Esportata perché la Sentinella confronta denominazioni e nomi di vino con lo
+ * stesso criterio: due normalizzatori che divergono sono un rischio di
+ * inesattezza, non una comodità.
+ */
+export function normaliseText(text: string): string {
 	return (
 		text
 			.normalize("NFKD")

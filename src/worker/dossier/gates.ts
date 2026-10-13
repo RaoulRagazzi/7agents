@@ -10,6 +10,7 @@
  */
 
 import type { Fact, GateTarget, Issue, TargetRef } from "./types.ts";
+import { targetMatches } from "./types.ts";
 
 export interface GateRequirement {
 	/** Ambito in cui la chiave deve esistere, approvata. */
@@ -75,16 +76,16 @@ export const GATES: Readonly<Record<GateTarget, GateSpec>> = {
 	},
 };
 
-/** Un'anomalia bloccante è rilevante se punta a questa destinazione concreta. */
+/**
+ * Un'anomalia bloccante è rilevante se punta a questa destinazione.
+ *
+ * La relazione vive in `targetMatches`: una referenza non qualificata blocca
+ * tutte, qualificata solo la sua.
+ */
 function blocks(issue: Issue, target: TargetRef): boolean {
 	if (issue.severity !== "bloccante") return false;
 	if (issue.state === "risolta" || issue.state === "accettata") return false;
-	return issue.targets.some(
-		(t) =>
-			t.target === target.target &&
-			// una referenza non qualificata blocca tutte; qualificata, solo la sua
-			(t.ref === undefined || t.ref === target.ref),
-	);
+	return issue.targets.some((t) => targetMatches(t, target));
 }
 
 function satisfies(fact: Fact, req: GateRequirement): boolean {

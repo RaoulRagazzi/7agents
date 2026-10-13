@@ -142,10 +142,34 @@ export interface Issue {
 	readonly factKey?: string;
 	/** Le evidenze: riferimenti a fatti e a passaggi di documento. */
 	readonly evidence: readonly Provenance[];
+	/**
+	 * Il motivo in chiaro, con la motivazione del controllo. È il testo da cui
+	 * l'Ambasciatore formula la domanda: ricostruirlo a valle non darebbe la
+	 * stessa cosa.
+	 */
+	readonly detail?: string;
 	readonly targets: readonly TargetRef[];
 	readonly state: "aperta" | "in_domanda" | "risolta" | "accettata";
 	/** Due cicli senza esito, poi escalation al Coordinatore. */
 	readonly cycle: 1 | 2;
+}
+
+/**
+ * Un'anomalia su `a` riguarda la destinazione `b`?
+ *
+ * La relazione è simmetrica nell'assenza di riferimento: un'anomalia non
+ * qualificata riguarda ogni referenza, e una domanda non qualificata («qualche
+ * referenza è sospesa?») è riguardata da ogni anomalia su una referenza. Senza
+ * il secondo verso, chiedere «referenza» senza riferimento darebbe sempre falso
+ * pur essendoci un blocco — un errore silenzioso.
+ *
+ * Definita una volta sola perché i cancelli e la Sentinella non possano
+ * divergere su cosa sospende cosa.
+ */
+export function targetMatches(a: TargetRef, b: TargetRef): boolean {
+	if (a.target !== b.target) return false;
+	if (a.ref === undefined || b.ref === undefined) return true;
+	return a.ref === b.ref;
 }
 
 /**

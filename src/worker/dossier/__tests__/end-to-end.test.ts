@@ -16,6 +16,7 @@ import { applyActivationEvent, decideActivation, operationKey } from "../activat
 import { planRevalidation } from "../invalidation.ts";
 import { assignReference } from "../assignment.ts";
 import { resolveCandidates } from "../candidates.ts";
+import { runDeterministicChecks } from "../sentinel.ts";
 import type { ActivationState, FactValue, Visibility } from "../types.ts";
 import { SqliteDatabase, fixedClock, sequentialIds } from "./sqlite-adapter.ts";
 
@@ -301,5 +302,114 @@ describe("il documento ostile", () => {
 		const rejections = await dossier.listRejections();
 		assert.equal(rejections.length, 1);
 		assert.equal(rejections[0]!.agent, "documentalista");
+	});
+});
+
+describe("dalla Sentinella al cancello", () => {
+	test("le anomalie passano nel fascicolo e chiudono la destinazione giusta", async () => {
+		// una referenza con la gradazione sbagliata di un fattore dieci
+		await stabilisci(specialista4, { type: "vino", ref: "w1" }, "denominazione",
+			txt("Soave Classico DOC"));
+		await stabilisci(specialista4, { type: "vino", ref: "w1" }, "tipologia", txt("fermo"));
+		await stabilisci(specialista4, { type: "vino", ref: "w1" }, "vitigni",
+			{ kind: "elenco", items: ["Garganega"] });
+		await stabilisci(specialista4, { type: "annata", ref: "w1:2021" }, "gradazione_alcolica",
+			{ kind: "numero", value: 125, unit: "%vol" });
+
+		// una seconda referenza, in ordine
+		await stabilisci(specialista4, { type: "vino", ref: "w2" }, "denominazione",
+			txt("Franciacorta DOCG"));
+		await stabilisci(specialista4, { type: "vino", ref: "w2" }, "tipologia", txt("spumante"));
+		await stabilisci(specialista4, { type: "vino", ref: "w2" }, "vitigni",
+			{ kind: "elenco", items: ["Chardonnay"] });
+		await stabilisci(specialista4, { type: "vino", ref: "w2" }, "metodo_spumantizzazione",
+			txt("metodo classico"));
+		await stabilisci(specialista4, { type: "annata", ref: "w2:2021" }, "gradazione_alcolica",
+			{ kind: "numero", value: 12.5, unit: "%vol" });
+
+		const facts = await dossier.listApprovedFacts();
+
+		// prima della Sentinella entrambi i cancelli sono aperti: il dato c'è
+		assert.equal(evaluateGate({ target: "referenza", ref: "w1" }, facts, []).open, true);
+		assert.equal(evaluateGate({ target: "referenza", ref: "w2" }, facts, []).open, true);
+
+		// la Sentinella deterministica trova il valore impossibile
+		const findings = runDeterministicChecks({ facts }, { currentYear: 2026 });
+		assert.deepEqual(
+			findings.map((x) => x.code),
+			["VALORE_IMPOSSIBILE"],
+		);
+
+		const ids = await dossier.openFindings(findings);
+		assert.equal(ids.length, 1);
+
+		// le anomalie rilette conservano il motivo in chiaro
+		const issues = await dossier.listOpenIssues();
+		assert.equal(issues.length, 1);
+		assert.equal(issues[0]!.code, "VALORE_IMPOSSIBILE");
+		assert.equal(issues[0]!.factKey, "gradazione_alcolica");
+		assert.match(issues[0]!.detail ?? "", /non è un vino/);
+		assert.equal(issues[0]!.evidence.length, 1, "l'evidenza documentale è conservata");
+
+		// e sospendono soltanto la referenza interessata
+		assert.equal(evaluateGate({ target: "referenza", ref: "w1" }, facts, issues).open, false);
+		assert.equal(evaluateGate({ target: "referenza", ref: "w2" }, facts, issues).open, true);
+	});
+
+	test("un'anomalia non bloccante non chiude nulla ma resta registrata", async () => {
+		await stabilisci(specialista4, { type: "vino", ref: "w1" }, "denominazione",
+			txt("Colli Inventati DOC"));
+		await stabilisci(specialista4, { type: "vino", ref: "w1" }, "tipologia", txt("fermo"));
+		await stabilisci(specialista4, { type: "vino", ref: "w1" }, "vitigni",
+			{ kind: "elenco", items: ["Vitigno Locale"] });
+		await stabilisci(specialista4, { type: "annata", ref: "w1:2021" }, "gradazione_alcolica",
+			{ kind: "numero", value: 12.5, unit: "%vol" });
+
+		const facts = await dossier.listApprovedFacts();
+		const findings = runDeterministicChecks({ facts }, { currentYear: 2026 });
+
+		assert.deepEqual(findings.map((x) => x.code), ["DENOMINAZIONE_IGNOTA"]);
+		assert.equal(findings[0]!.severity, "miglioramento");
+
+		await dossier.openFindings(findings);
+		const issues = await dossier.listOpenIssues();
+
+		assert.equal(issues.length, 1);
+		assert.equal(
+			evaluateGate({ target: "referenza", ref: "w1" }, facts, issues).open,
+			true,
+			"un miglioramento non deve bloccare l'attivazione minima",
+		);
+	});
+
+	test("il profilo e le referenze si sospendono in modo indipendente", async () => {
+		// un dato riservato esposto blocca il profilo, non le referenze
+		const out = await dossier.proposeFact(anagrafica, {
+			cantinaId: "c1",
+			scope: { type: "sede", ref: "s1" },
+			key: "partita_iva",
+			value: txt("IT00000000000"),
+			// l'ammissione impone riservato, quindi il fascicolo nasce corretto
+			visibility: "riservato",
+			provenance: [{ kind: "documento", documentId: "doc_atto", page: 1 }],
+			state: "proposto",
+		});
+		assert.ok(out.ok);
+		await dossier.approve(out.factId, { approvedBy: "orchestratore" });
+
+		await stabilisci(specialista4, { type: "vino", ref: "w1" }, "denominazione",
+			txt("Soave Classico"));
+		await stabilisci(specialista4, { type: "vino", ref: "w1" }, "tipologia", txt("fermo"));
+		await stabilisci(specialista4, { type: "vino", ref: "w1" }, "vitigni",
+			{ kind: "elenco", items: ["Garganega"] });
+		await stabilisci(specialista4, { type: "annata", ref: "w1:2021" }, "gradazione_alcolica",
+			{ kind: "numero", value: 12.5, unit: "%vol" });
+
+		const facts = await dossier.listApprovedFacts();
+		const findings = runDeterministicChecks({ facts }, { currentYear: 2026 });
+
+		// nessuna anomalia: l'ammissione ha già impedito l'esposizione
+		assert.deepEqual(findings, [], "un fascicolo corretto non produce anomalie");
+		assert.equal(evaluateGate({ target: "referenza", ref: "w1" }, facts, []).open, true);
 	});
 });

@@ -15,6 +15,7 @@ import { admitFact, approveFact } from "./admission.ts";
 import type { ApprovalRequest, RejectionCode } from "./admission.ts";
 import type { VinoVeritasAgentSpec } from "./agents.ts";
 import { CantinaArchive } from "./archive.ts";
+import type { Finding as SentinelFinding } from "./sentinel.ts";
 import type { SqlBoundStatement, SqlDatabase, SqlValue } from "./sql.ts";
 import { isUniqueViolation } from "./sql.ts";
 import type {
@@ -204,6 +205,7 @@ export class CantinaDossier {
 				targets_json: string;
 				state: string;
 				cycle: number;
+				detail: string | null;
 			}>();
 
 		return rows.results.map((r) => ({
@@ -217,6 +219,7 @@ export class CantinaDossier {
 			targets: JSON.parse(r.targets_json) as Issue["targets"],
 			state: r.state as Issue["state"],
 			cycle: r.cycle as 1 | 2,
+			detail: r.detail ?? undefined,
 		}));
 	}
 
@@ -413,8 +416,8 @@ export class CantinaDossier {
 		await this.#db
 			.prepare(
 				`INSERT INTO issue (id,cantina_id,severity,code,scope_type,scope_ref,fact_key,
-				                    evidence_json,targets_json,state,cycle,created_at)
-				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+				                    evidence_json,targets_json,state,cycle,created_at,detail)
+				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			)
 			.bind(
 				id,
@@ -429,9 +432,40 @@ export class CantinaDossier {
 				issue.state,
 				issue.cycle,
 				this.#clock.now(),
+				issue.detail ?? null,
 			)
 			.run();
 		return id;
+	}
+
+	/**
+	 * Apre le anomalie prodotte dalla Sentinella.
+	 *
+	 * La conversione è una copia di campi, non una traduzione: `Finding` e
+	 * `Issue` condividono deliberatamente la forma, perché due forme che quasi
+	 * combaciano sono un errore in attesa.
+	 */
+	async openFindings(
+		findings: readonly SentinelFinding[],
+		cycle: 1 | 2 = 1,
+	): Promise<string[]> {
+		const ids: string[] = [];
+		for (const f of findings) {
+			ids.push(
+				await this.openIssue({
+					severity: f.severity,
+					code: f.code,
+					scope: f.scope,
+					factKey: f.factKey,
+					evidence: f.evidence,
+					targets: f.targets,
+					detail: f.detail,
+					state: "aperta",
+					cycle,
+				}),
+			);
+		}
+		return ids;
 	}
 
 	async listRejections(): Promise<

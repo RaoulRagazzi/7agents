@@ -22,7 +22,7 @@ export interface Ontology {
 	readonly version: string;
 	readonly tipologie: readonly string[];
 	readonly colori: readonly string[];
-	readonly unita: Readonly<Record<string, string>>;
+	readonly unita: Readonly<Record<string, string | undefined>>;
 	readonly formati: readonly { readonly nome: string; readonly litri: number }[];
 	readonly denominazioni: readonly Denominazione[];
 	readonly terminiAffinamento: readonly string[];
