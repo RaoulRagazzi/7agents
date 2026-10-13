@@ -63,14 +63,23 @@ prendere decisioni sbagliate.
 | Ambasciatore: formulazione del testo nella lingua del produttore | ⬜ richiede il modello | — |
 | Coordinatore come Workflow durevole | ⬜ | — |
 
-## Tranche 5-6
+## Tranche 5 — Multilingue e attivazione
 
-Interamente specifica: Revisore multilingue, livello anticorruzione verso
-VinoVeritas, pilota.
+| Componente | Stato | Dove |
+|---|---|---|
+| Revisore: fedeltà numerica fra convenzioni decimali | ✅ | [`src/worker/dossier/numbers.ts`](../../src/worker/dossier/numbers.ts) |
+| Revisore: unità, termini protetti, affermazioni aggiunte | ✅ | [`src/worker/dossier/reviewer.ts`](../../src/worker/dossier/reviewer.ts) |
+| Revisore: fedeltà del significato e qualità della resa | ⬜ richiede il modello |— |
+| Lavorazione delle traduzioni in Batch | ⬜ | — |
+| Livello anticorruzione verso VinoVeritas | ⬜ richiede la Tranche 1 | — |
+
+## Tranche 6
+
+Interamente specifica: pilota e rilascio graduale.
 
 ## Cosa i test verificano oggi
 
-449 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
+518 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
 il type stripping nativo esegue i `.ts` direttamente e `node:sqlite` fornisce il
 motore: i test del repository girano sullo stesso SQL e sugli stessi vincoli che
 agiranno su D1, non su un simulacro).
@@ -105,6 +114,10 @@ agiranno su D1, non su un simulacro).
 | **Ambasciatore: le domande che non si fanno** | Se il dato è già **approvato** non si chiede; se è soltanto proposto o superato si chiede ancora; se il produttore ha dichiarato «non disponibile» non si richiede mai più; una domanda già posta non si ripone, in qualunque stato tranne «scaduta»; un miglioramento facoltativo non interrompe il produttore. Più anomalie sullo stesso dato sono **una** domanda, e una bloccante nel gruppo rende bloccante il gruppo |
 | **Ambasciatore: nessuna anomalia svanisce** | 800 insiemi generati: ogni anomalia interrogabile finisce in una bozza **oppure** fra le scartate con un motivo, mai in nessuna delle due e mai in entrambe. È l'invariante che non si vede fallire: una domanda che non parte non produce alcun errore, solo un cancello che non si apre mai |
 | **Ciclo di vita della domanda** | Il secondo ciclo **aggiorna la riga esistente**: una domanda ha un'identità e un contatore, non due incarnazioni. Dopo due cicli senza esito si escala e il contatore non supera il limite. Non si risponde a una bozza non partita né due volte alla stessa domanda; una risposta tardiva dopo la scadenza resta accettabile. Il rilascio manda le bloccanti per prime e limita il lotto |
+| **Revisore: numeri fra lingue** | «12,5» e «12.5» sono lo stesso valore; «1.200» porta **entrambe** le letture (milleduecento e uno-punto-due) invece di indovinarne una, così l'ambiguità fra convenzioni non genera mai un falso allarme — e un falso allarme su un numero bloccherebbe una traduzione corretta. Il confronto tiene conto della molteplicità: due occorrenze nell'originale richiedono due occorrenze nella traduzione |
+| **Revisore: la trappola del superlativo** | «Soave Superiore» **non** è una qualità aggiunta. Il lessico delle affermazioni esclude per costruzione le qualificazioni di denominazione (`superiore`, `classico`, `riserva`, `gran`, `selezione`) e i descrittori sensoriali legittimi (`intenso`, `ricco`, `elegante`), verificato da un test; i termini protetti escono dal testo prima della scansione, dal più lungo al più corto |
+| **Revisore: simboli e parole** | `%vol`, `g/l`, `mg/l`, `q/ha`, `°C` sono invarianti e la loro perdita è bloccante; `mesi` → `months` e `m s.l.m.` → `m a.s.l.` sono traduzioni corrette e non producono nulla. Ogni unità invariante dichiarata esiste nell'ontologia, e ogni unità dell'ontologia è classificata in uno dei due gruppi |
+| **Revisore: tenuta su ingressi ostili** | 1.200 coppie generate da testi vuoti, emoji, 3.000 caratteri, byte nulli e lingue senza lessico: nessuna eccezione, nessun motivo vuoto, esito deterministico. E un testo confrontato **con sé stesso** non produce mai anomalie — qualunque segnalazione lì sarebbe falsa per costruzione |
 | **Coerenza fra le tabelle** | Ogni chiave con un intervallo ha la stessa unità nell'ontologia e viceversa — una chiave con un intervallo ma senza unità dichiarata farebbe classificare un numero senza sapere in che unità è espresso |
 | **Segmentazione** | Ogni offset è esatto (`page.text.slice(charStart, charEnd) === text`, verificato su ogni frammento); nessun frammento supera il massimo né attraversa una pagina; **ogni carattere non bianco di ogni pagina è coperto**; i frammenti si sovrappongono così che il contesto non si perda al taglio; una parola più lunga della finestra viene tagliata invece di bloccare; un testo di 300 paragrafi termina senza girare a vuoto |
 | **Archivio** | Lo stesso contenuto caricato due volte non genera due fonti **né riscrive l'originale**; lo stesso contenuto in due cantine resta separato, con chiavi d'oggetto distinte; un documento altrui non è raggiungibile per id e registrarvi un'estrazione è un errore; un testo illeggibile **non viene segmentato** e si recupera con una nuova estrazione riuscita; un'associazione incerta resta `proposto` con la sua fiducia; i blocchi passati al modello vengono dall'archivio della cantina, quindi un documento di un'altra cantina non può entrare in una richiesta |

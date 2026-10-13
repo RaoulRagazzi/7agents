@@ -329,10 +329,23 @@ denominazioni, valori numerici e unità di misura. Distingue la traduzione tecni
 dall'adattamento promozionale e tratta i due casi con criteri diversi.
 
 **Il guardrail più importante.** Non aggiunge premi, qualità o caratteristiche
-assenti nell'originale. È verificabile meccanicamente: un controllo confronta
-l'insieme delle entità numeriche e delle denominazioni presenti nella traduzione
-con quelle dell'originale; un'aggiunta non giustificata è un'anomalia bloccante
-per la destinazione linguistica.
+assenti nell'originale. È verificabile meccanicamente, e la verifica distingue
+ciò che è un fatto da ciò che è un'euristica:
+
+| Controllo | Esito | Perché |
+|---|---|---|
+| Un valore numerico aggiunto o perso | **bloccante** | Un numero c'è o non c'è: è un fatto. Il confronto funziona fra convenzioni decimali diverse — «12,5» e «12.5» sono lo stesso valore, e «1.200» porta *entrambe* le letture possibili invece di indovinarne una |
+| Una denominazione o un vitigno tradotti | **bloccante** | «Soave Classico» non diventa «Classic Soave»: sono termini che compaiono verbatim |
+| Un'unità **simbolica** persa (`%vol`, `g/l`) | **bloccante** in traduzione tecnica | I simboli sono identici in ogni lingua |
+| Un'unità **lessicale** tradotta (`mesi` → `months`) | *nessuna anomalia* | È una traduzione corretta: pretenderla invariata segnalerebbe come errore il lavoro fatto bene |
+| Un'affermazione di merito aggiunta | **da confermare** | Si riconosce da un lessico, e un lessico è un'euristica |
+
+L'ultima riga merita la sua ragione. «Superiore» è una qualificazione di
+denominazione, non una vanteria: un lessico ingenuo bloccherebbe «Soave
+Superiore» per un superlativo inesistente, che è un errore peggiore del non
+controllare. I termini protetti vengono quindi rimossi dal testo **prima** della
+scansione, il lessico esclude deliberatamente le qualificazioni di denominazione
+e i descrittori sensoriali, e ciò che resta produce al massimo una conferma.
 
 **Il legame con la versione.** Ogni traduzione registra la versione esatta del
 testo di partenza. Quando quella cambia, la traduzione si marca `stale` —
