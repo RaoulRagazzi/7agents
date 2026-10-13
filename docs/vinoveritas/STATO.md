@@ -29,9 +29,10 @@ prendere decisioni sbagliate.
 | Invalidazione selettiva lungo il grafo | ✅ | [`src/worker/dossier/invalidation.ts`](../../src/worker/dossier/invalidation.ts) |
 | Chiave d'operazione e macchina a stati dell'attivazione | ✅ | [`src/worker/dossier/activation.ts`](../../src/worker/dossier/activation.ts) |
 | Confine e-label asserito in CI | ✅ | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) |
-| Tabella di precedenza e tolleranze per chiave | 🟡 valori dichiarati, risolutore dei candidati da scrivere | `admission.ts` → `PRECEDENZA`, `TOLLERANZA` |
-| Accesso a D1 con `cantina_id` imposto in un unico punto | ⬜ | — |
-| Test di isolamento fra cantine | ⬜ | — |
+| Tabella di precedenza e risolutore delle fonti contraddittorie | ✅ | [`src/worker/dossier/candidates.ts`](../../src/worker/dossier/candidates.ts) |
+| Accesso al fascicolo con `cantina_id` imposto in un unico punto | ✅ | [`src/worker/dossier/repository.ts`](../../src/worker/dossier/repository.ts) |
+| Pacchetto di contenuti per il Sommelier, filtrato per visibilità | ✅ | [`src/worker/dossier/pack.ts`](../../src/worker/dossier/pack.ts) |
+| Test di isolamento fra cantine | ✅ **criterio di completamento della Tranche 2 soddisfatto** | [`__tests__/isolation.test.ts`](../../src/worker/dossier/__tests__/isolation.test.ts) |
 | Ontologia enologica versionata in KV | ⬜ | — |
 | Kernel d'agente (invocazione, budget, registrazione su `agent_run`) | ⬜ | — |
 
@@ -43,9 +44,15 @@ anticorruzione verso VinoVeritas, pilota.
 
 ## Cosa i test verificano oggi
 
-105 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
+181 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
 il type stripping nativo esegue i `.ts` direttamente e `node:sqlite` fornisce il
-motore per le prove sullo schema).
+motore: i test del repository girano sullo stesso SQL e sugli stessi vincoli che
+agiranno su D1, non su un simulacro).
+
+> Vincolo da conoscere: il type stripping di Node è *strip-only* e rifiuta la
+> sintassi che richiede generazione di codice — proprietà di parametro nel
+> costruttore, `enum`, `namespace`, decoratori. È il prezzo dello zero
+> dipendenze.
 
 | Area | Cosa è dimostrato |
 |---|---|
@@ -57,6 +64,12 @@ motore per le prove sullo schema).
 | **Invalidazione** | La chiusura dei dipendenti non risale verso le origini, non tocca i rami indipendenti e tollera i cicli; un aggiornamento alla gradazione 2021 marca tre traduzioni su cinque e una operazione su tre, lasciando intatti il 2020 e la storia della cantina |
 | **Attivazione** | La chiave è stabile e indipendente dall'ordine dei fatti, cambia con la versione, e separa cantine, destinazioni e riferimenti; `verificato` è raggiungibile **solo** da `pubblicato` con la rilettura coincidente — verificato esaurendo tutte le coppie stato/evento; una divergenza segnala senza avanzare; un'operazione verificata si salta, una a metà riprende dal punto raggiunto |
 | **Assegnazione** | Spumanti e passiti all'agente 4 per ogni colore; bianchi fermi all'agente 4; rossi e rosati fermi all'agente 5; tipologia dubbia al Coordinatore; funzione totale e deterministica su tutte le 20 combinazioni |
+| **Isolamento** | Due onboarding contemporanei con stesse denominazioni, stesse annate, nomi quasi uguali e la stessa impronta di documento: nessun fatto, citazione, anomalia o rifiuto attraversa il confine. Il `cantinaId` dichiarato da un agente viene ignorato; un fatto di un'altra cantina non si approva né si supera per id; un pacchetto scarta i fatti altrui anche se glieli si passa; ogni tabella del fascicolo porta `cantina_id` |
+| **Atomicità** | `supersede` scrive superamento, nuova versione e provenienze in una sola transazione quando il driver la offre; se una scrittura fallisce il fascicolo resta identico — la chiave continua a essere servita da un fatto vivo, e un cancello valutato in quell'istante non legge un dato assente; senza `batch` il comportamento degradato è definito, non casuale |
+| **Repository** | Andata e ritorno di tutte e cinque le varianti di provenienza; il vincolo del fatto vivo diventa un esito tipizzato invece di un'eccezione; una nuova versione porta la precedente a `superato` conservando la storia; un fatto senza provenienza letto dal database solleva `CorruptDossierError` invece di propagarsi |
+| **Fonti contraddittorie** | Il caso del programma (scheda 13,5 contro listino 14) apre una contraddizione con entrambe le evidenze e **nessun vincitore**; la tolleranza di un decimo sulla gradazione tiene; "D.O.C." e "DOC" sono la stessa denominazione; una divergenza a livello più basso non apre una contraddizione |
+| **Pacchetto** | Nessun fatto `riservato` o `interno` entra in alcun pacchetto, per nessuna destinazione; il Sommelier è la destinazione più restrittiva; un `non_disponibile` non diventa contenuto; ogni fatto scartato è contato in esattamente una categoria |
+| **Catena completa** | Dal primo materiale al via libera: il profilo si apre solo a dati completi e si richiude su un'anomalia sopravvenuta; una referenza percorre assegnazione → risoluzione candidati → proposta → approvazione → cancello → pacchetto → chiave d'operazione → quattro stati → verifica; una nuova versione richiude il cancello finché non è approvata e cambia la chiave d'operazione; un'istruzione ostile in un PDF non cambia i permessi, e il tentativo compare nel registro |
 | **Schema** | La migrazione si applica su un motore SQLite reale e i suoi vincoli mordono: `fact_live` respinge un secondo fatto vivo sulla stessa chiave e si libera dopo il superamento; un fatto approvato senza approvatore è respinto; una provenienza documentale senza pagina è respinta; lo stesso sha256 nella stessa cantina non genera due fonti ma in un'altra cantina sì; la stessa chiave d'operazione è respinta; il limite di due cicli e le quattro categorie di gravità sono imposti dal database |
 
 ## Cosa i test **non** verificano
@@ -66,12 +79,18 @@ Perché non c'è ancora nulla da verificare, non perché sia stato trascurato:
 - Nessuna chiamata reale a Claude, quindi nessuna misura di qualità di
   estrazione, di costo o di tasso di riuso della cache. Le stime in
   [05 §5](./05-piano.md#5-costo-ordine-di-grandezza) restano stime.
-- Nessuna query su **D1**. I vincoli dello schema sono esercitati, ma contro
-  `node:sqlite` in memoria: D1 è SQLite, quindi i vincoli provati sono gli
-  stessi che agiranno, però restano da verificare il comportamento delle
-  migrazioni su D1, i limiti di dimensione e la latenza reale.
-- Nessun accesso applicativo al fascicolo: le funzioni sono pure e non c'è
-  ancora il livello che impone `cantina_id` in un unico punto.
+- Nessuna query su **D1**. Il repository e lo schema sono esercitati contro
+  `node:sqlite` in memoria: D1 è SQLite e la porta SQL ha la forma di D1 — un
+  `D1Database` la soddisfa strutturalmente, senza adattatore — ma restano da
+  verificare il comportamento delle migrazioni su D1, i limiti di dimensione,
+  la latenza reale. L'atomicità è coperta: la porta espone un `batch`
+  opzionale con la stessa firma di `D1Database.batch`, `supersede` lo usa, e
+  un test prova che una scrittura fallita non lascia nulla applicato — ma su
+  D1 va riverificato, perché la semantica transazionale del driver non è
+  quella di `node:sqlite`.
+- Nessuna concorrenza reale: la serializzazione delle scritture per cantina è
+  affidata al Durable Object, che non esiste ancora. I test di isolamento
+  provano la separazione dei dati, non l'assenza di corse.
 - Nessuna integrazione con VinoVeritas: il livello anticorruzione non esiste, e
   la Tranche 1 deve ancora accertare se le scritture esposte sono idempotenti.
 - Nessuna prova di isolamento fra cantine, che è il criterio di completamento

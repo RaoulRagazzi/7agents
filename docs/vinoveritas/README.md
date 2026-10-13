@@ -33,13 +33,16 @@ Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
 - [`src/worker/dossier/types.ts`](../../src/worker/dossier/types.ts) — tipi del fascicolo: ambito, fatto, provenienza, anomalia, operazione di attivazione
 - [`src/worker/dossier/agents.ts`](../../src/worker/dossier/agents.ts) — i dieci agenti come dati: ambiti, strumenti, budget, `canApprove: false`
 - [`src/worker/dossier/admission.ts`](../../src/worker/dossier/admission.ts) — la funzione di ammissione e la transizione di approvazione
+- [`src/worker/dossier/repository.ts`](../../src/worker/dossier/repository.ts) — il fascicolo di **una** cantina: `cantina_id` imposto in un unico punto, e nessun metodo che lo accetti come argomento
+- [`src/worker/dossier/candidates.ts`](../../src/worker/dossier/candidates.ts) — risoluzione delle fonti contraddittorie per tabella di precedenza
+- [`src/worker/dossier/pack.ts`](../../src/worker/dossier/pack.ts) — il pacchetto per il Sommelier: il punto in cui il confine di visibilità viene tracciato
 - [`src/worker/dossier/gates.ts`](../../src/worker/dossier/gates.ts) — cancelli dichiarativi e valutatore puro: il "via libera" è una funzione, non una frase del modello
 - [`src/worker/dossier/invalidation.ts`](../../src/worker/dossier/invalidation.ts) — invalidazione selettiva lungo il grafo delle dipendenze
 - [`src/worker/dossier/activation.ts`](../../src/worker/dossier/activation.ts) — chiave d'operazione idempotente e macchina a stati dell'attivazione
 - [`src/worker/dossier/assignment.ts`](../../src/worker/dossier/assignment.ts) — regola deterministica di assegnazione fra agente 4 e agente 5
 
 ```bash
-npm test        # 105 test, nessuna dipendenza aggiuntiva (Node 22)
+npm test        # 181 test, nessuna dipendenza aggiuntiva (Node 22)
 npx tsc -b      # typecheck
 ```
 
