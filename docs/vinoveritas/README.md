@@ -29,7 +29,7 @@ profilo, referenze, Sommelier e materiali commerciali.
 Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
 [stato di avanzamento](./STATO.md) dice con precisione cosa è implementato.
 
-- [`migrations/0001_fascicolo.sql`](../../migrations/0001_fascicolo.sql) — schema D1: i vincoli che portano le invarianti a livello di database
+- [`migrations/`](../../migrations/) — schema D1: i vincoli che portano le invarianti a livello di database
 - [`src/worker/dossier/types.ts`](../../src/worker/dossier/types.ts) — tipi del fascicolo: ambito, fatto, provenienza, anomalia, operazione di attivazione
 - [`src/worker/dossier/agents.ts`](../../src/worker/dossier/agents.ts) — i dieci agenti come dati: ambiti, strumenti, budget, `canApprove: false`
 - [`src/worker/dossier/admission.ts`](../../src/worker/dossier/admission.ts) — la funzione di ammissione e la transizione di approvazione
@@ -39,6 +39,8 @@ Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
 - [`src/worker/dossier/kernel.ts`](../../src/worker/dossier/kernel.ts) — il kernel d'agente: prefisso stabile per la cache, budget di durata/costo/tentativi, registrazione di ogni esecuzione
 - [`src/worker/dossier/model.ts`](../../src/worker/dossier/model.ts) — la porta verso il modello e il listino con cui il costo si calcola in un unico punto
 - [`src/worker/dossier/ontology.ts`](../../src/worker/dossier/ontology.ts) — l'ontologia enologica versionata, resa deterministica perché la cache ripaghi
+- [`src/worker/dossier/archive.ts`](../../src/worker/dossier/archive.ts) — l'archivio delle fonti di una cantina: deduplica, estrazione, collegamenti incerti
+- [`src/worker/dossier/ingest.ts`](../../src/worker/dossier/ingest.ts) — segmentazione con offset esatti, classificazione proposta, giudizio di leggibilità
 - [`src/worker/dossier/anthropic.ts`](../../src/worker/dossier/anthropic.ts) — l'unico file che conosce l'SDK
 - [`src/worker/dossier/gates.ts`](../../src/worker/dossier/gates.ts) — cancelli dichiarativi e valutatore puro: il "via libera" è una funzione, non una frase del modello
 - [`src/worker/dossier/invalidation.ts`](../../src/worker/dossier/invalidation.ts) — invalidazione selettiva lungo il grafo delle dipendenze
@@ -46,7 +48,7 @@ Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
 - [`src/worker/dossier/assignment.ts`](../../src/worker/dossier/assignment.ts) — regola deterministica di assegnazione fra agente 4 e agente 5
 
 ```bash
-npm test        # 218 test, nessuna dipendenza aggiuntiva (Node 22)
+npm test        # 278 test, nessuna dipendenza aggiuntiva (Node 22)
 npx tsc -b      # typecheck
 ```
 

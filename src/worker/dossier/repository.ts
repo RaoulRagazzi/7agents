@@ -14,6 +14,7 @@ import type { FactDraft } from "./admission.ts";
 import { admitFact, approveFact } from "./admission.ts";
 import type { ApprovalRequest, RejectionCode } from "./admission.ts";
 import type { VinoVeritasAgentSpec } from "./agents.ts";
+import { CantinaArchive } from "./archive.ts";
 import type { SqlBoundStatement, SqlDatabase, SqlValue } from "./sql.ts";
 import { isUniqueViolation } from "./sql.ts";
 import type {
@@ -68,11 +69,24 @@ export class CorruptDossierError extends Error {
 	override readonly name = "CorruptDossierError";
 }
 
+export type WriteCode =
+	| RejectionCode
+	/** Esiste già un fatto vivo per quella (ambito, chiave). */
+	| "CHIAVE_GIA_VIVA"
+	/**
+	 * Il fatto da superare non è più vivo: qualcun altro ne ha già aperto una
+	 * nuova versione. È il caso di due aggiornamenti concorrenti, e va
+	 * restituito come esito perché il chiamante possa rileggere e riprovare —
+	 * non propagato come eccezione.
+	 */
+	| "CONFLITTO_VERSIONE"
+	| "FATTO_ASSENTE";
+
 export type WriteOutcome =
 	| { readonly ok: true; readonly factId: string }
 	| {
 			readonly ok: false;
-			readonly code: RejectionCode | "CHIAVE_GIA_VIVA";
+			readonly code: WriteCode;
 			readonly detail: string;
 	  };
 
@@ -94,6 +108,9 @@ export class CantinaDossier {
 	readonly #clock: Clock;
 	readonly #ids: IdSource;
 
+	/** L'archivio delle fonti della stessa cantina, con la stessa garanzia. */
+	readonly archive: CantinaArchive;
+
 	constructor(
 		db: SqlDatabase,
 		cantinaId: string,
@@ -104,6 +121,7 @@ export class CantinaDossier {
 		this.#cantinaId = cantinaId;
 		this.#clock = clock;
 		this.#ids = ids;
+		this.archive = new CantinaArchive(db, cantinaId, clock, ids);
 	}
 
 	get cantinaId(): string {
@@ -311,8 +329,20 @@ export class CantinaDossier {
 		if (previous === null) {
 			return {
 				ok: false,
-				code: "CHIAVE_GIA_VIVA",
+				code: "FATTO_ASSENTE",
 				detail: "fatto da superare non presente in questo fascicolo",
+			};
+		}
+
+		// Chi è già stato superato non si supera di nuovo. Senza questo controllo
+		// due aggiornamenti concorrenti produrrebbero due versioni 2 della stessa
+		// chiave, e l'unica cosa che li fermerebbe sarebbe l'indice dei fatti
+		// vivi — con un'eccezione al posto di un esito.
+		if (previous.state === "superato") {
+			return {
+				ok: false,
+				code: "CONFLITTO_VERSIONE",
+				detail: `il fatto ${factId} (versione ${previous.version}) è già stato superato`,
 			};
 		}
 
@@ -329,9 +359,12 @@ export class CantinaDossier {
 		// devono avvenire insieme: a metà strada l'indice dei fatti vivi
 		// resterebbe senza alcun fatto vivo per quella chiave, e un cancello
 		// valutato in quell'istante leggerebbe un dato semplicemente assente.
-		await this.#writeAtomically([
+		const statements = [
 			this.#db
-				.prepare(`UPDATE fact SET state='superato' WHERE id=? AND cantina_id=?`)
+				.prepare(
+					`UPDATE fact SET state='superato'
+					 WHERE id=? AND cantina_id=? AND state IN ('proposto','da_confermare','approvato')`,
+				)
 				.bind(factId, this.#cantinaId),
 			this.#db
 				.prepare(
@@ -358,7 +391,19 @@ export class CantinaDossier {
 					this.#clock.now(),
 				),
 			...this.#sourceStatements(id, scoped.provenance),
-		]);
+		];
+
+		try {
+			await this.#writeAtomically(statements);
+		} catch (error) {
+			if (isUniqueViolation(error)) {
+				// un'altra scrittura ha occupato la chiave fra la lettura e qui
+				const detail = `un altro fatto vivo occupa ${scoped.scope.type}/${scoped.key}`;
+				await this.#recordRejection(agent, scoped, "CHIAVE_GIA_VIVA", detail);
+				return { ok: false, code: "CHIAVE_GIA_VIVA", detail };
+			}
+			throw error;
+		}
 
 		return { ok: true, factId: id };
 	}

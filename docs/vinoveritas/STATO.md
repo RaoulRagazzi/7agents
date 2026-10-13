@@ -19,7 +19,7 @@ prendere decisioni sbagliate.
 
 | Componente | Stato | Dove |
 |---|---|---|
-| Schema del fascicolo (D1) | ✅ migrazione scritta e provata su SQLite; non ancora applicata su D1 | [`migrations/0001_fascicolo.sql`](../../migrations/0001_fascicolo.sql) |
+| Schema del fascicolo (D1) | ✅ due migrazioni, provate a catena su SQLite; non ancora applicate su D1 | [`migrations/`](../../migrations/) |
 | Tipi del fascicolo: fatto, ambito, provenienza, anomalia | ✅ | [`src/worker/dossier/types.ts`](../../src/worker/dossier/types.ts) |
 | I dieci agenti come dati, con ambiti e strumenti | ✅ | [`src/worker/dossier/agents.ts`](../../src/worker/dossier/agents.ts) |
 | Funzione di ammissione (ambito, provenienza, chiavi riservate) | ✅ | [`src/worker/dossier/admission.ts`](../../src/worker/dossier/admission.ts) |
@@ -38,15 +38,26 @@ prendere decisioni sbagliate.
 | Porta verso il modello e contabilità del costo | ✅ | [`src/worker/dossier/model.ts`](../../src/worker/dossier/model.ts) |
 | Adattatore verso l'API Claude | 🟡 scritto e verificato dai tipi dell'SDK, **mai eseguito** | [`src/worker/dossier/anthropic.ts`](../../src/worker/dossier/anthropic.ts) |
 
-## Tranche 3-6
+## Tranche 3 — Raccolta specializzata
 
-Interamente specifica: Documentalista e pipeline di ingestione, agenti 2–5,
-Sentinella, Ambasciatore, Coordinatore come Workflow, Revisore, livello
-anticorruzione verso VinoVeritas, pilota.
+| Componente | Stato | Dove |
+|---|---|---|
+| Archivio delle fonti, per cantina | ✅ | [`src/worker/dossier/archive.ts`](../../src/worker/dossier/archive.ts) |
+| Conservazione indirizzata per contenuto e deduplica | ✅ | [`src/worker/dossier/storage.ts`](../../src/worker/dossier/storage.ts) |
+| Segmentazione con offset esatti, classificazione, giudizio di leggibilità | ✅ | [`src/worker/dossier/ingest.ts`](../../src/worker/dossier/ingest.ts) |
+| Adattatore R2 per la porta degli oggetti | ⬜ poche righe, da scrivere | — |
+| Estrazione del testo con citazioni (la metà che richiede il modello) | ⬜ | — |
+| Indicizzazione dei frammenti in Vectorize | ⬜ | — |
+| Agenti 2–5 all'opera su casi di prova reali | ⬜ richiede la prima chiamata reale | — |
+
+## Tranche 4-6
+
+Interamente specifica: Sentinella, Ambasciatore, Coordinatore come Workflow,
+Revisore, livello anticorruzione verso VinoVeritas, pilota.
 
 ## Cosa i test verificano oggi
 
-218 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
+278 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
 il type stripping nativo esegue i `.ts` direttamente e `node:sqlite` fornisce il
 motore: i test del repository girano sullo stesso SQL e sugli stessi vincoli che
 agiranno su D1, non su un simulacro).
@@ -76,7 +87,10 @@ agiranno su D1, non su un simulacro).
 | **Prefisso stabile** | Due compiti del tutto diversi producono un prefisso **identico byte per byte**; il punto di interruzione della cache sta sull'ultimo blocco stabile e solo lì; nessun orario, data con orario o UUID compare nel prefisso; l'ordine degli ambiti non lo cambia; l'ontologia sta nel prefisso e non nella parte variabile |
 | **Budget** | Una singola chiamata troppo lunga viene **interrotta** (il segnale raggiunge la richiesta in volo, verificato); la durata residua si riduce fra i tentativi e si esaurisce; tre tentativi dentro il limite di costo possono superarlo insieme, e il controllo lo rileva; il tetto della cantina blocca prima di spendere |
 | **Kernel** | Un compito fuori dagli ambiti leggibili non spende alcuna chiamata; una proposta citata diventa provenienza documentale e si approva, una senza citazioni resta `inferenza_modello` e **non** si approva; una proposta fuori ambito è respinta e contata senza fermare le altre; un errore non ritentabile si ferma al primo tentativo, un rifiuto del modello non si ritenta identico; ogni esecuzione è registrata su `agent_run` qualunque sia l'esito, perché un indicatore che conta solo i successi mente |
-| **Schema** | La migrazione si applica su un motore SQLite reale e i suoi vincoli mordono: `fact_live` respinge un secondo fatto vivo sulla stessa chiave e si libera dopo il superamento; un fatto approvato senza approvatore è respinto; una provenienza documentale senza pagina è respinta; lo stesso sha256 nella stessa cantina non genera due fonti ma in un'altra cantina sì; la stessa chiave d'operazione è respinta; il limite di due cicli e le quattro categorie di gravità sono imposti dal database |
+| **Segmentazione** | Ogni offset è esatto (`page.text.slice(charStart, charEnd) === text`, verificato su ogni frammento); nessun frammento supera il massimo né attraversa una pagina; **ogni carattere non bianco di ogni pagina è coperto**; i frammenti si sovrappongono così che il contesto non si perda al taglio; una parola più lunga della finestra viene tagliata invece di bloccare; un testo di 300 paragrafi termina senza girare a vuoto |
+| **Archivio** | Lo stesso contenuto caricato due volte non genera due fonti **né riscrive l'originale**; lo stesso contenuto in due cantine resta separato, con chiavi d'oggetto distinte; un documento altrui non è raggiungibile per id e registrarvi un'estrazione è un errore; un testo illeggibile **non viene segmentato** e si recupera con una nuova estrazione riuscita; un'associazione incerta resta `proposto` con la sua fiducia; i blocchi passati al modello vengono dall'archivio della cantina, quindi un documento di un'altra cantina non può entrare in una richiesta |
+| **Conflitti concorrenti** | Due aggiornamenti concorrenti sullo stesso fatto: il secondo è `CONFLITTO_VERSIONE`, non un'eccezione, e non produce una seconda versione 2; se un altro fatto occupa la chiave la transazione si annulla e il precedente resta vivo alla versione 1 |
+| **Schema** | Le migrazioni si applicano a catena e su un motore SQLite reale e i suoi vincoli mordono: `fact_live` respinge un secondo fatto vivo sulla stessa chiave e si libera dopo il superamento; un fatto approvato senza approvatore è respinto; una provenienza documentale senza pagina è respinta; lo stesso sha256 nella stessa cantina non genera due fonti ma in un'altra cantina sì; la stessa chiave d'operazione è respinta; il limite di due cicli e le quattro categorie di gravità sono imposti dal database |
 
 ## Cosa i test **non** verificano
 

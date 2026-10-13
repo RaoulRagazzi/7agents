@@ -22,10 +22,16 @@ import type { Clock, IdSource } from "../repository.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-export const MIGRATION = readFileSync(
-	join(here, "..", "..", "..", "..", "migrations", "0001_fascicolo.sql"),
-	"utf8",
-);
+const MIGRATIONS_DIR = join(here, "..", "..", "..", "..", "migrations");
+
+/**
+ * Tutte le migrazioni, nell'ordine. Applicarle a catena nei test verifica che
+ * compongano: una `ALTER TABLE` su una tabella che non esiste più nella forma
+ * attesa fallisce qui invece che in produzione.
+ */
+export const MIGRATION = ["0001_fascicolo.sql", "0002_archivio.sql"]
+	.map((name) => readFileSync(join(MIGRATIONS_DIR, name), "utf8"))
+	.join("\n");
 
 /**
  * Una sola classe per entrambi i ruoli della porta: `bind` restituisce una

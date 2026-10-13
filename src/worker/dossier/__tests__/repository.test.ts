@@ -278,6 +278,63 @@ describe("nuova versione", () => {
 		assert.equal(vivo!.id, second.factId);
 	});
 
+	test("due aggiornamenti concorrenti: il secondo è un conflitto, non un'eccezione", async () => {
+		const first = await dossier.proposeFact(specialista, draft());
+		assert.ok(first.ok);
+
+		const nuova = draft({ value: { kind: "numero", value: 13.8, unit: "%vol" } });
+		const a = await dossier.supersede(specialista, first.factId, nuova);
+		assert.ok(a.ok);
+
+		// il secondo ha letto la stessa versione 1 e arriva dopo
+		const b = await dossier.supersede(specialista, first.factId, nuova);
+		assert.equal(b.ok, false);
+		assert.equal(!b.ok && b.code, "CONFLITTO_VERSIONE");
+		assert.match(!b.ok ? b.detail : "", /già stato superato/);
+
+		// e non ha prodotto una seconda versione 2
+		const versioni = (await dossier.listFacts()).map((f) => f.version).sort();
+		assert.deepEqual(versioni, [1, 2]);
+	});
+
+	test("se un altro fatto occupa la chiave, il conflitto è un esito tipizzato", async () => {
+		// f1 su w1:2021, f2 su w1:2022
+		const first = await dossier.proposeFact(specialista, draft());
+		const other = await dossier.proposeFact(
+			specialista,
+			draft({ scope: { type: "annata", ref: "w1:2022" } }),
+		);
+		assert.ok(first.ok && other.ok);
+
+		// superare f1 con una nuova versione che punta alla chiave già occupata
+		const out = await dossier.supersede(
+			specialista,
+			first.factId,
+			draft({ scope: { type: "annata", ref: "w1:2022" } }),
+		);
+		assert.equal(out.ok, false);
+		assert.equal(!out.ok && out.code, "CHIAVE_GIA_VIVA");
+
+		// la transazione è stata annullata: f1 è ancora vivo e alla versione 1
+		const f1 = await dossier.getLiveFact(
+			{ type: "annata", ref: "w1:2021" },
+			"gradazione_alcolica",
+		);
+		assert.equal(f1!.id, first.factId);
+		assert.equal(f1!.state, "proposto");
+		assert.equal((await dossier.listFacts()).length, 2);
+
+		// e il tentativo è registrato
+		const rejections = await dossier.listRejections();
+		assert.ok(rejections.some((r) => r.code === "CHIAVE_GIA_VIVA"));
+	});
+
+	test("un id inesistente si distingue da un conflitto", async () => {
+		const out = await dossier.supersede(specialista, "fact_mai_esistito", draft());
+		assert.equal(out.ok, false);
+		assert.equal(!out.ok && out.code, "FATTO_ASSENTE");
+	});
+
 	test("una nuova versione fuori ambito è respinta e non supera nulla", async () => {
 		const first = await dossier.proposeFact(specialista, draft());
 		assert.ok(first.ok);
