@@ -1,5 +1,8 @@
 # 05 — Piano di realizzazione
 
+> Lo [stato di avanzamento](./STATO.md) dice, passo per passo, cosa è già
+> codice eseguibile e cosa è ancora soltanto specifica.
+
 ## 1. I dodici passi
 
 Cosa farei, nell'ordine in cui lo farei. Ogni passo ha un criterio di

@@ -22,14 +22,26 @@ profilo, referenze, Sommelier e materiali commerciali.
 | 03 | [I dieci agenti](./03-agenti.md) | Contratto di ciascun agente: ambito, strumenti, schema, modello, guardrail |
 | 04 | [Flussi operativi](./04-flussi.md) | Percorso end-to-end, cancelli, ciclo delle domande, attivazione idempotente, ripresa |
 | 05 | [Piano di realizzazione](./05-piano.md) | I dodici passi, le sei tranche, casi di prova, indicatori, costi |
+| — | **[Stato di avanzamento](./STATO.md)** | **Cosa è codice eseguibile e cosa è ancora soltanto specifica** |
 
 ## Ancoraggio nel codice
 
-Il contratto delle fondamenta comuni (Tranche 2) non vive solo come prosa:
+Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
+[stato di avanzamento](./STATO.md) dice con precisione cosa è implementato.
 
+- [`migrations/0001_fascicolo.sql`](../../migrations/0001_fascicolo.sql) — schema D1: i vincoli che portano le invarianti a livello di database
 - [`src/worker/dossier/types.ts`](../../src/worker/dossier/types.ts) — tipi del fascicolo: ambito, fatto, provenienza, anomalia, operazione di attivazione
+- [`src/worker/dossier/agents.ts`](../../src/worker/dossier/agents.ts) — i dieci agenti come dati: ambiti, strumenti, budget, `canApprove: false`
+- [`src/worker/dossier/admission.ts`](../../src/worker/dossier/admission.ts) — la funzione di ammissione e la transizione di approvazione
 - [`src/worker/dossier/gates.ts`](../../src/worker/dossier/gates.ts) — cancelli dichiarativi e valutatore puro: il "via libera" è una funzione, non una frase del modello
+- [`src/worker/dossier/invalidation.ts`](../../src/worker/dossier/invalidation.ts) — invalidazione selettiva lungo il grafo delle dipendenze
+- [`src/worker/dossier/activation.ts`](../../src/worker/dossier/activation.ts) — chiave d'operazione idempotente e macchina a stati dell'attivazione
 - [`src/worker/dossier/assignment.ts`](../../src/worker/dossier/assignment.ts) — regola deterministica di assegnazione fra agente 4 e agente 5
+
+```bash
+npm test        # 105 test, nessuna dipendenza aggiuntiva (Node 22)
+npx tsc -b      # typecheck
+```
 
 ## Le tre invarianti
 

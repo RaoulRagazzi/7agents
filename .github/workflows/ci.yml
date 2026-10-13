@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  verifica:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -b
+
+      - name: Lint
+        run: npm run lint
+
+      # Fra questi test c'è l'asserzione sul confine e-label: se una capacità
+      # che tocca la pagina normativa comparisse fra gli strumenti di un agente,
+      # questo passo fallisce. Vedi docs/vinoveritas/03-agenti.md §9
+      - name: Test del fascicolo
+        run: npm test
+
+      - name: Build
+        run: npx vite build
