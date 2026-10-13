@@ -35,9 +35,13 @@
 	},
 	"private": true,
 	"scripts": {
+		"autotest": "vite build && node scripts/autotest.mjs",
 		"build": "tsc -b && vite build",
 		"cf-typegen": "wrangler types",
 		"check": "tsc && vite build && npm test && wrangler deploy --dry-run",
+		"d1:migrate": "wrangler d1 migrations apply DB --local",
+		"d1:migrate:remote": "wrangler d1 migrations apply DB --remote",
+		"d1:reset": "rm -rf .wrangler/state/v3/d1 && npm run d1:migrate",
 		"deploy": "wrangler deploy",
 		"dev": "vite",
 		"lint": "eslint .",

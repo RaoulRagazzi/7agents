@@ -1,0 +1,13 @@
+# Segreti dello sviluppo locale. Copia in `.dev.vars` (che è escluso dal
+# repository) e riempi i valori. Wrangler li espone come variabili
+# dell'ambiente del worker.
+#
+# Necessaria per l'estrazione con citazioni, la revisione avversariale del
+# significato e la formulazione delle domande. Senza, la metà deterministica
+# del sistema funziona e il resto no.
+ANTHROPIC_API_KEY=
+
+# Solo per il rilascio remoto. Vedi docs/vinoveritas/06-cloudflare.md §3:
+# conviene un token dedicato al progetto, con scadenza e revocabile.
+# CLOUDFLARE_API_TOKEN=
+# CLOUDFLARE_ACCOUNT_ID=

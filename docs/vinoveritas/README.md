@@ -22,6 +22,7 @@ profilo, referenze, Sommelier e materiali commerciali.
 | 03 | [I dieci agenti](./03-agenti.md) | Contratto di ciascun agente: ambito, strumenti, schema, modello, guardrail |
 | 04 | [Flussi operativi](./04-flussi.md) | Percorso end-to-end, cancelli, ciclo delle domande, attivazione idempotente, ripresa |
 | 05 | [Piano di realizzazione](./05-piano.md) | I dodici passi, le sei tranche, casi di prova, indicatori, costi |
+| 06 | [Ambiente Cloudflare](./06-cloudflare.md) | Cosa funziona in locale senza account, cosa è verificato su D1 reale, cosa serve per il remoto |
 | — | **[Stato di avanzamento](./STATO.md)** | **Cosa è codice eseguibile e cosa è ancora soltanto specifica** |
 
 ## Ancoraggio nel codice
@@ -54,7 +55,8 @@ Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
 - [`src/worker/dossier/assignment.ts`](../../src/worker/dossier/assignment.ts) — regola deterministica di assegnazione fra agente 4 e agente 5
 
 ```bash
-npm test        # 518 test, nessuna dipendenza aggiuntiva (Node 22)
+npm test        # 520 test su node:sqlite, nessuna dipendenza aggiuntiva (Node 22)
+npm run autotest   # la stessa verifica d'integrazione, su D1 reale nel worker
 npx tsc -b      # typecheck
 ```
 

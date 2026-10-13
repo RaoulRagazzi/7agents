@@ -19,7 +19,7 @@ prendere decisioni sbagliate.
 
 | Componente | Stato | Dove |
 |---|---|---|
-| Schema del fascicolo (D1) | ✅ quattro migrazioni, provate a catena su SQLite; non ancora applicate su D1 | [`migrations/`](../../migrations/) |
+| Schema del fascicolo (D1) | ✅ quattro migrazioni, **applicate e verificate su D1 reale** (locale) | [`migrations/`](../../migrations/) |
 | Tipi del fascicolo: fatto, ambito, provenienza, anomalia | ✅ | [`src/worker/dossier/types.ts`](../../src/worker/dossier/types.ts) |
 | I dieci agenti come dati, con ambiti e strumenti | ✅ | [`src/worker/dossier/agents.ts`](../../src/worker/dossier/agents.ts) |
 | Funzione di ammissione (ambito, provenienza, chiavi riservate) | ✅ | [`src/worker/dossier/admission.ts`](../../src/worker/dossier/admission.ts) |
@@ -33,6 +33,7 @@ prendere decisioni sbagliate.
 | Accesso al fascicolo con `cantina_id` imposto in un unico punto | ✅ | [`src/worker/dossier/repository.ts`](../../src/worker/dossier/repository.ts) |
 | Pacchetto di contenuti per il Sommelier, filtrato per visibilità | ✅ | [`src/worker/dossier/pack.ts`](../../src/worker/dossier/pack.ts) |
 | Test di isolamento fra cantine | ✅ **criterio di completamento della Tranche 2 soddisfatto** | [`__tests__/isolation.test.ts`](../../src/worker/dossier/__tests__/isolation.test.ts) |
+| Verifica d'integrazione sullo stesso codice, su due motori | ✅ `node:sqlite` e D1 reale | [`selftest.ts`](../../src/worker/dossier/selftest.ts) |
 | Ontologia enologica come dato versionato | ✅ seme e forma, reso deterministico per la cache; il caricamento da KV resta da fare | [`src/worker/dossier/ontology.ts`](../../src/worker/dossier/ontology.ts) |
 | Kernel d'agente: prefisso stabile, budget, tentativi, registrazione | ✅ | [`src/worker/dossier/kernel.ts`](../../src/worker/dossier/kernel.ts) |
 | Porta verso il modello e contabilità del costo | ✅ | [`src/worker/dossier/model.ts`](../../src/worker/dossier/model.ts) |
@@ -79,7 +80,7 @@ Interamente specifica: pilota e rilascio graduale.
 
 ## Cosa i test verificano oggi
 
-518 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
+520 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
 il type stripping nativo esegue i `.ts` direttamente e `node:sqlite` fornisce il
 motore: i test del repository girano sullo stesso SQL e sugli stessi vincoli che
 agiranno su D1, non su un simulacro).
@@ -131,15 +132,17 @@ Perché non c'è ancora nulla da verificare, non perché sia stato trascurato:
 - Nessuna chiamata reale a Claude, quindi nessuna misura di qualità di
   estrazione, di costo o di tasso di riuso della cache. Le stime in
   [05 §5](./05-piano.md#5-costo-ordine-di-grandezza) restano stime.
-- Nessuna query su **D1**. Il repository e lo schema sono esercitati contro
-  `node:sqlite` in memoria: D1 è SQLite e la porta SQL ha la forma di D1 — un
-  `D1Database` la soddisfa strutturalmente, senza adattatore — ma restano da
-  verificare il comportamento delle migrazioni su D1, i limiti di dimensione,
-  la latenza reale. L'atomicità è coperta: la porta espone un `batch`
-  opzionale con la stessa firma di `D1Database.batch`, `supersede` lo usa, e
-  un test prova che una scrittura fallita non lascia nulla applicato — ma su
-  D1 va riverificato, perché la semantica transazionale del driver non è
-  quella di `node:sqlite`.
+- **Nessuna query su D1 remoto.** Il fascicolo è ora verificato su D1 **reale**
+  — migrazioni, vincoli, chiavi esterne, atomicità di `batch()`, viaggio dei
+  valori attraverso il binding — ma in emulazione locale (`workerd`). Restano
+  da verificare sul remoto: latenza, limiti di dimensione del database e di
+  durata delle richieste, e il comportamento delle migrazioni su un database
+  con dati. Vedi [06 — Ambiente Cloudflare](./06-cloudflare.md).
+- **La rotta `/api/autotest` scrive righe di prova e non va esposta in
+  esercizio.** Va rimossa o chiusa dietro un controllo d'accesso prima del
+  primo rilascio pubblico.
+- Nessun binding R2, KV o Vectorize configurato: l'archivio degli originali usa
+  la propria porta e in prova un'implementazione in memoria.
 - Nessuna concorrenza reale: la serializzazione delle scritture per cantina è
   affidata al Durable Object, che non esiste ancora. I test di isolamento
   provano la separazione dei dati, non l'assenza di corse.
