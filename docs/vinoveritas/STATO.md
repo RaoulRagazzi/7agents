@@ -19,7 +19,7 @@ prendere decisioni sbagliate.
 
 | Componente | Stato | Dove |
 |---|---|---|
-| Schema del fascicolo (D1) | ✅ tre migrazioni, provate a catena su SQLite; non ancora applicate su D1 | [`migrations/`](../../migrations/) |
+| Schema del fascicolo (D1) | ✅ quattro migrazioni, provate a catena su SQLite; non ancora applicate su D1 | [`migrations/`](../../migrations/) |
 | Tipi del fascicolo: fatto, ambito, provenienza, anomalia | ✅ | [`src/worker/dossier/types.ts`](../../src/worker/dossier/types.ts) |
 | I dieci agenti come dati, con ambiti e strumenti | ✅ | [`src/worker/dossier/agents.ts`](../../src/worker/dossier/agents.ts) |
 | Funzione di ammissione (ambito, provenienza, chiavi riservate) | ✅ | [`src/worker/dossier/admission.ts`](../../src/worker/dossier/admission.ts) |
@@ -58,7 +58,9 @@ prendere decisioni sbagliate.
 | Intervalli di plausibilità enologica, con motivazione | ✅ | [`src/worker/dossier/ranges.ts`](../../src/worker/dossier/ranges.ts) |
 | Le anomalie passano nel fascicolo conservando il motivo | ✅ | `repository.ts` → `openFindings` |
 | Sentinella: revisione avversariale del significato | ⬜ richiede il modello | — |
-| Ambasciatore: deduplica, raggruppamento, due cicli | ⬜ | — |
+| Ambasciatore: deduplica, raggruppamento, politica di rilascio | ✅ | [`src/worker/dossier/ambassador.ts`](../../src/worker/dossier/ambassador.ts) |
+| Domande: ciclo di vita, secondo ciclo, escalation | ✅ | [`src/worker/dossier/questions.ts`](../../src/worker/dossier/questions.ts) |
+| Ambasciatore: formulazione del testo nella lingua del produttore | ⬜ richiede il modello | — |
 | Coordinatore come Workflow durevole | ⬜ | — |
 
 ## Tranche 5-6
@@ -68,7 +70,7 @@ VinoVeritas, pilota.
 
 ## Cosa i test verificano oggi
 
-381 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
+449 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
 il type stripping nativo esegue i `.ts` direttamente e `node:sqlite` fornisce il
 motore: i test del repository girano sullo stesso SQL e sugli stessi vincoli che
 agiranno su D1, non su un simulacro).
@@ -100,6 +102,9 @@ agiranno su D1, non su un simulacro).
 | **Kernel** | Un compito fuori dagli ambiti leggibili non spende alcuna chiamata; una proposta citata diventa provenienza documentale e si approva, una senza citazioni resta `inferenza_modello` e **non** si approva; una proposta fuori ambito è respinta e contata senza fermare le altre; un errore non ritentabile si ferma al primo tentativo, un rifiuto del modello non si ritenta identico; ogni esecuzione è registrata su `agent_run` qualunque sia l'esito, perché un indicatore che conta solo i successi mente |
 | **Sentinella** | Per **ogni** intervallo: i bordi appartengono all'intervallo, appena fuori è insolito, appena oltre è impossibile. Un valore impossibile è bloccante, uno insolito è da confermare — perché esistono vini così. Una denominazione ignota è un **miglioramento**, non un blocco: l'ontologia è un seme. I vitigni si controllano **solo** se la denominazione è nota, altrimenti l'elenco degli ammessi non è noto. Con l'unità sbagliata il valore non si classifica: una causa, un'anomalia. L'anno corrente arriva dal contesto, non dall'orologio di sistema, e un anno più alto non può aggiungere anomalie |
 | **Sentinella: tenuta su ingressi ostili** | 1.000 fascicoli generati con riferimenti illegali, `NaN`, `Infinity`, stringhe da 5.000 caratteri e byte nulli: nessuna eccezione, nessun codice fuori elenco, nessun motivo vuoto o contenente «undefined», esito deterministico e **indipendente dall'ordine dei fatti in ingresso** |
+| **Ambasciatore: le domande che non si fanno** | Se il dato è già **approvato** non si chiede; se è soltanto proposto o superato si chiede ancora; se il produttore ha dichiarato «non disponibile» non si richiede mai più; una domanda già posta non si ripone, in qualunque stato tranne «scaduta»; un miglioramento facoltativo non interrompe il produttore. Più anomalie sullo stesso dato sono **una** domanda, e una bloccante nel gruppo rende bloccante il gruppo |
+| **Ambasciatore: nessuna anomalia svanisce** | 800 insiemi generati: ogni anomalia interrogabile finisce in una bozza **oppure** fra le scartate con un motivo, mai in nessuna delle due e mai in entrambe. È l'invariante che non si vede fallire: una domanda che non parte non produce alcun errore, solo un cancello che non si apre mai |
+| **Ciclo di vita della domanda** | Il secondo ciclo **aggiorna la riga esistente**: una domanda ha un'identità e un contatore, non due incarnazioni. Dopo due cicli senza esito si escala e il contatore non supera il limite. Non si risponde a una bozza non partita né due volte alla stessa domanda; una risposta tardiva dopo la scadenza resta accettabile. Il rilascio manda le bloccanti per prime e limita il lotto |
 | **Coerenza fra le tabelle** | Ogni chiave con un intervallo ha la stessa unità nell'ontologia e viceversa — una chiave con un intervallo ma senza unità dichiarata farebbe classificare un numero senza sapere in che unità è espresso |
 | **Segmentazione** | Ogni offset è esatto (`page.text.slice(charStart, charEnd) === text`, verificato su ogni frammento); nessun frammento supera il massimo né attraversa una pagina; **ogni carattere non bianco di ogni pagina è coperto**; i frammenti si sovrappongono così che il contesto non si perda al taglio; una parola più lunga della finestra viene tagliata invece di bloccare; un testo di 300 paragrafi termina senza girare a vuoto |
 | **Archivio** | Lo stesso contenuto caricato due volte non genera due fonti **né riscrive l'originale**; lo stesso contenuto in due cantine resta separato, con chiavi d'oggetto distinte; un documento altrui non è raggiungibile per id e registrarvi un'estrazione è un errore; un testo illeggibile **non viene segmentato** e si recupera con una nuova estrazione riuscita; un'associazione incerta resta `proposto` con la sua fiducia; i blocchi passati al modello vengono dall'archivio della cantina, quindi un documento di un'altra cantina non può entrare in una richiesta |
@@ -135,6 +140,12 @@ Perché non c'è ancora nulla da verificare, non perché sia stato trascurato:
   chiamata reale è il prossimo passo che le sostituisce con numeri.
 - L'ontologia è un seme di cinque denominazioni, non il catalogo completo, e non
   viene ancora caricata da KV.
+- La tabella `question` non ha un vincolo `CHECK` sullo stato, a differenza di
+  `issue`, `answer`, `translation` e `activation_op`. SQLite non permette di
+  aggiungere un `CHECK` con `ALTER TABLE`, e ricostruire la tabella per
+  allinearla non valeva il rischio: lo stato è imposto dai tipi e dalla macchina
+  a stati, verificata su tutte le coppie stato/evento. Se la tabella andrà
+  ricostruita per altri motivi, è l'occasione per aggiungerlo.
 - Nessuna integrazione con VinoVeritas: il livello anticorruzione non esiste, e
   la Tranche 1 deve ancora accertare se le scritture esposte sono idempotenti.
 - Nessuna prova di isolamento fra cantine, che è il criterio di completamento

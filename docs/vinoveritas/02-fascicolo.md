@@ -202,11 +202,18 @@ Tre meccanismi impediscono la duplicazione delle domande:
 2. **Chiave semantica.** Ogni domanda porta un'impronta calcolata su
    `(ambito, chiave, tipo di richiesta)`. Una domanda con chiave già presente fra
    quelle inviate o risposte non viene emessa una seconda volta.
-3. **`non_disponibile` è un fatto.** Una risposta di quel tipo genera un fatto
-   approvato con valore `non_disponibile` e provenienza `dichiarazione`. Da quel
-   momento nessun agente ripropone la domanda, e la Sentinella declassa
-   l'anomalia da bloccante a miglioramento facoltativo dove le regole lo
-   consentono.
+3. **`non_disponibile` è un fatto.** Una risposta di quel tipo porta a un fatto
+   con valore `non_disponibile` e provenienza `dichiarazione`. Da quel momento
+   nessun agente ripropone la domanda, e la Sentinella declassa l'anomalia da
+   bloccante a miglioramento facoltativo dove le regole lo consentono.
+
+   **Chi lo approva.** Non l'Ambasciatore, che non ha ambiti in scrittura: lui
+   registra la risposta e riferisce cosa ne segue. Propone lo specialista
+   competente, approva l'orchestrazione. Il `non_disponibile` è il solo caso in
+   cui quell'approvazione è **meccanica** — non c'è nulla che uno specialista
+   possa riesaminare, perché il valore non afferma niente sul vino: afferma che
+   la cantina non ha quel dato. È comunque una transizione del piano di
+   orchestrazione, registrata come tale, non una scorciatoia dell'Ambasciatore.
 
 Dopo **due cicli** senza soluzione, la domanda passa a `escalata` e il
 Coordinatore propone gestione manuale o rinvio della parte interessata.

@@ -217,13 +217,22 @@ anomalie aperte
 
 **Rilascio a lotti.** Le domande non partono una alla volta. Si accumulano in una
 cartella e vengono rilasciate quando si verifica una di tre condizioni: un
-cancello è bloccato, la finestra di attesa scade, oppure si supera una soglia di
-domande pendenti. È la misura che tiene basso l'indicatore *minuti richiesti al
+cancello è bloccato, la soglia di domande pendenti è raggiunta, oppure la
+finestra di attesa scade. A questo si aggiunge un tetto per lotto: oltre sette
+domande in una volta il produttore si scoraggia, e ciò che resta parte col lotto
+seguente. È la misura che tiene basso l'indicatore *minuti richiesti al
 produttore*: meglio sei domande insieme che sei interruzioni.
 
+**La chiave semantica non include il codice dell'anomalia.** Due anomalie diverse
+sullo stesso dato — «manca» e «è contraddittorio» — sono la stessa domanda per il
+produttore: *che valore ha questo dato?* Includere il codice le farebbe partire
+entrambe, che è esattamente la duplicazione da evitare.
+
 **Tre modi di rispondere.** Rispondere, allegare un documento, oppure dichiarare
-che il dato non è disponibile. Il terzo genera un fatto approvato con valore
-`non_disponibile` — ed è ciò che permette al ciclo di terminare.
+che il dato non è disponibile. Il terzo porta a un fatto `non_disponibile` — ed è
+ciò che permette al ciclo di terminare. L'Ambasciatore non lo scrive: restituisce
+la **conseguenza** della risposta (cosa proporre, per mano di chi, e se
+l'approvazione è meccanica), e l'orchestrazione la esegue.
 
 **I guardrail.**
 

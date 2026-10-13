@@ -29,7 +29,12 @@ const MIGRATIONS_DIR = join(here, "..", "..", "..", "..", "migrations");
  * compongano: una `ALTER TABLE` su una tabella che non esiste più nella forma
  * attesa fallisce qui invece che in produzione.
  */
-export const MIGRATION = ["0001_fascicolo.sql", "0002_archivio.sql", "0003_anomalie.sql"]
+export const MIGRATION = [
+	"0001_fascicolo.sql",
+	"0002_archivio.sql",
+	"0003_anomalie.sql",
+	"0004_domande.sql",
+]
 	.map((name) => readFileSync(join(MIGRATIONS_DIR, name), "utf8"))
 	.join("\n");
 

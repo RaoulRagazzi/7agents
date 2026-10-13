@@ -43,6 +43,8 @@ Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
 - [`src/worker/dossier/ingest.ts`](../../src/worker/dossier/ingest.ts) — segmentazione con offset esatti, classificazione proposta, giudizio di leggibilità
 - [`src/worker/dossier/sentinel.ts`](../../src/worker/dossier/sentinel.ts) — la Sentinella deterministica: 19 controlli esatti, registrati come dati
 - [`src/worker/dossier/ranges.ts`](../../src/worker/dossier/ranges.ts) — intervalli di plausibilità enologica, ciascuno con la propria motivazione
+- [`src/worker/dossier/ambassador.ts`](../../src/worker/dossier/ambassador.ts) — l'Ambasciatore: quali domande **non** fare, come raggrupparle, quando rilasciarle
+- [`src/worker/dossier/questions.ts`](../../src/worker/dossier/questions.ts) — il ciclo di vita della domanda, il secondo ciclo, l'escalation
 - [`src/worker/dossier/anthropic.ts`](../../src/worker/dossier/anthropic.ts) — l'unico file che conosce l'SDK
 - [`src/worker/dossier/gates.ts`](../../src/worker/dossier/gates.ts) — cancelli dichiarativi e valutatore puro: il "via libera" è una funzione, non una frase del modello
 - [`src/worker/dossier/invalidation.ts`](../../src/worker/dossier/invalidation.ts) — invalidazione selettiva lungo il grafo delle dipendenze
@@ -50,7 +52,7 @@ Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
 - [`src/worker/dossier/assignment.ts`](../../src/worker/dossier/assignment.ts) — regola deterministica di assegnazione fra agente 4 e agente 5
 
 ```bash
-npm test        # 381 test, nessuna dipendenza aggiuntiva (Node 22)
+npm test        # 449 test, nessuna dipendenza aggiuntiva (Node 22)
 npx tsc -b      # typecheck
 ```
 

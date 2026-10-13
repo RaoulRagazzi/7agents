@@ -15,6 +15,7 @@ import { admitFact, approveFact } from "./admission.ts";
 import type { ApprovalRequest, RejectionCode } from "./admission.ts";
 import type { VinoVeritasAgentSpec } from "./agents.ts";
 import { CantinaArchive } from "./archive.ts";
+import { CantinaQuestions } from "./questions.ts";
 import type { Finding as SentinelFinding } from "./sentinel.ts";
 import type { SqlBoundStatement, SqlDatabase, SqlValue } from "./sql.ts";
 import { isUniqueViolation } from "./sql.ts";
@@ -112,6 +113,9 @@ export class CantinaDossier {
 	/** L'archivio delle fonti della stessa cantina, con la stessa garanzia. */
 	readonly archive: CantinaArchive;
 
+	/** Le domande della stessa cantina, con la stessa garanzia. */
+	readonly questions: CantinaQuestions;
+
 	constructor(
 		db: SqlDatabase,
 		cantinaId: string,
@@ -123,6 +127,7 @@ export class CantinaDossier {
 		this.#clock = clock;
 		this.#ids = ids;
 		this.archive = new CantinaArchive(db, cantinaId, clock, ids);
+		this.questions = new CantinaQuestions(db, cantinaId, clock, ids);
 	}
 
 	get cantinaId(): string {
