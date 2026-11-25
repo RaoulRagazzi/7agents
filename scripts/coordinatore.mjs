@@ -115,6 +115,83 @@ check(
 );
 
 
+// ─── archivio: caricamento, deduplica, estrazione testuale ─────────────────
+const SCHEDA = `Soave Classico DOC 2021. Gradazione dodici virgola cinque per cento in volume.
+Affinamento in acciaio per sei mesi, poi tre mesi in bottiglia prima della vendita.
+Il vigneto si trova a trecento metri di altitudine, con esposizione a sud-est.`;
+
+async function carica(nome, tipo, corpo) {
+	const res = await fetch(`${base}/api/cantina/${cantinaViva}/documenti`, {
+		method: "PUT",
+		headers: { "content-type": tipo, "x-filename": nome },
+		body: corpo,
+	});
+	return { status: res.status, body: await res.json().catch(() => null) };
+}
+
+const { status: s1, body: d1 } = await carica("scheda-tecnica-soave.txt", "text/plain", SCHEDA);
+check(
+	"un materiale testuale si carica ed è estratto subito",
+	s1 === 201 && d1?.status === "nuovo" && d1?.estratto === true && d1?.frammenti > 0,
+	JSON.stringify(d1),
+);
+check(
+	"la classe è proposta dal nome del file",
+	d1?.classe === "scheda_tecnica" && d1?.daConfermare === false,
+	`classe=${d1?.classe} daConfermare=${d1?.daConfermare}`,
+);
+
+const { status: s2, body: d2 } = await carica("copia-della-scheda.txt", "text/plain", SCHEDA);
+check(
+	"lo stesso contenuto non genera una seconda fonte",
+	s2 === 200 && d2?.status === "duplicato" && d2?.documentId === d1?.documentId,
+	JSON.stringify(d2),
+);
+
+const { body: d3 } = await carica("scansione.pdf", "application/pdf", "%PDF-1.4 finto");
+check(
+	"un PDF resta caricato e dichiara perché l'estrazione è rinviata",
+	d3?.status === "nuovo" && d3?.estratto === false && /modello/.test(d3?.dettaglio ?? ""),
+	JSON.stringify(d3),
+);
+
+const { body: d4 } = await carica("sporco.txt", "text/plain", "~|#@^¬ł€¶•ªº–≠«∑€®†¥øπ å∫ç∂´ƒ©");
+check(
+	"un testo illeggibile non viene segmentato e lo dice",
+	d4?.estratto === false && /alfabetico|breve/.test(d4?.dettaglio ?? ""),
+	JSON.stringify(d4),
+);
+
+const { status: vuoto } = await carica("vuoto.txt", "text/plain", "");
+check("un corpo vuoto è respinto", vuoto === 400, `status=${vuoto}`);
+
+const { body: elenco } = await call(`/api/cantina/${cantinaViva}/documenti`);
+// verifica per nome, non per conteggio: la rotta di semina lascia un proprio
+// documento, e un'asserzione sul totale si rompe a ogni cosa che se ne aggiunge
+const statoDi = (nome) =>
+	(elenco?.documenti ?? []).find((d) => d.filename === nome)?.status;
+check(
+	"l'elenco dei materiali riflette lo stato di ciascuno",
+	statoDi("scheda-tecnica-soave.txt") === "estratto" &&
+		statoDi("scansione.pdf") === "caricato" &&
+		statoDi("sporco.txt") === "illeggibile",
+	JSON.stringify((elenco?.documenti ?? []).map((d) => [d.filename, d.status])),
+);
+check(
+	"il documento estratto porta il numero di pagine e la dimensione",
+	(() => {
+		const d = (elenco?.documenti ?? []).find((x) => x.filename === "scheda-tecnica-soave.txt");
+		return d?.pages === 1 && typeof d?.sizeBytes === "number" && d.sizeBytes > 0;
+	})(),
+	JSON.stringify((elenco?.documenti ?? []).find((x) => x.filename === "scheda-tecnica-soave.txt")),
+);
+check(
+	"il documento illeggibile porta il motivo",
+	typeof (elenco?.documenti ?? []).find((x) => x.filename === "sporco.txt")?.illegibleReason ===
+		"string",
+	JSON.stringify((elenco?.documenti ?? []).find((x) => x.filename === "sporco.txt")),
+);
+
 // ─── il percorso, con un'attesa lunga: si deve sospendere ───────────────────
 const { status: avviato, body: istanza } = await post("/api/onboarding", {
 	cantinaId: cantinaViva,

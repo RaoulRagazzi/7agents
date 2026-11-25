@@ -210,6 +210,66 @@ app.post("/api/onboarding/:id/risposte", async (c) => {
 	}
 });
 
+// ─── Materiali ──────────────────────────────────────────────────────────────
+
+/** Oltre questa dimensione il materiale non viene accettato. */
+const LIMITE_BYTE = 20 * 1024 * 1024;
+
+/**
+ * Carica un materiale nell'archivio della cantina.
+ *
+ * Il corpo è il file grezzo; nome e tipo arrivano dalle intestazioni. Una
+ * fonte testuale viene anche estratta subito: il contenuto **è** il testo.
+ */
+app.put("/api/cantina/:id/documenti", async (c) => {
+	const cantinaId = c.req.param("id");
+	const filename = c.req.header("x-filename") ?? "senza-nome";
+	const mime = c.req.header("content-type") ?? "application/octet-stream";
+	const uploadedBy = c.req.header("x-caricato-da") ?? "produttore";
+
+	const buffer = await c.req.arrayBuffer();
+	if (buffer.byteLength === 0) {
+		return c.json({ errore: "corpo vuoto" }, 400);
+	}
+	if (buffer.byteLength > LIMITE_BYTE) {
+		return c.json(
+			{ errore: `materiale oltre il limite di ${LIMITE_BYTE} byte` },
+			413,
+		);
+	}
+
+	const attore = c.env.CANTINA.get(c.env.CANTINA.idFromName(cantinaId));
+	try {
+		const legato = await attore.bind(cantinaId);
+		if (!legato.ok) return c.json({ errore: legato.detail }, 409);
+
+		const esito = await attore.ingestDocument({
+			bytes: new Uint8Array(buffer),
+			// il nome arriva da fuori: si accorcia e si ripulisce invece di
+			// fidarsi, perché finisce nei metadati dell'oggetto e nei referti
+			filename: filename.replace(/[\u0000-\u001f]/g, "").slice(0, 200),
+			mime: mime.split(";")[0]!.trim().slice(0, 100),
+			uploadedBy: uploadedBy.slice(0, 100),
+		});
+		return c.json(esito, esito.status === "nuovo" ? 201 : 200);
+	} catch (error) {
+		return c.json({ errore: messaggio(error) }, 500);
+	}
+});
+
+/** I materiali di una cantina. */
+app.get("/api/cantina/:id/documenti", async (c) => {
+	const cantinaId = c.req.param("id");
+	const attore = c.env.CANTINA.get(c.env.CANTINA.idFromName(cantinaId));
+	try {
+		const legato = await attore.bind(cantinaId);
+		if (!legato.ok) return c.json({ errore: legato.detail }, 409);
+		return c.json({ documenti: await attore.listDocuments() });
+	} catch (error) {
+		return c.json({ errore: messaggio(error) }, 500);
+	}
+});
+
 /** Le domande di una cantina, per chi deve rispondere. */
 app.get("/api/cantina/:id/domande", async (c) => {
 	const cantinaId = c.req.param("id");

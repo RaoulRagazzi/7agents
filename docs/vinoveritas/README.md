@@ -51,6 +51,7 @@ Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
 - [`src/worker/actor.ts`](../../src/worker/actor.ts) — l'attore di una cantina: il punto di ingresso serializzato al suo fascicolo
 - [`src/worker/coordinator.ts`](../../src/worker/coordinator.ts) — il Coordinatore come Workflow durevole: cancelli come codice, sospensione e ripresa
 - [`src/worker/dossier/lock.ts`](../../src/worker/dossier/lock.ts) — la coda seriale, e perché il thread singolo del Durable Object non basta
+- [`src/worker/dossier/r2.ts`](../../src/worker/dossier/r2.ts) — l'adattatore R2, e il ritaglio dei byte da cui dipende la deduplica
 - [`src/worker/dossier/anthropic.ts`](../../src/worker/dossier/anthropic.ts) — l'unico file che conosce l'SDK
 - [`src/worker/dossier/gates.ts`](../../src/worker/dossier/gates.ts) — cancelli dichiarativi e valutatore puro: il "via libera" è una funzione, non una frase del modello
 - [`src/worker/dossier/invalidation.ts`](../../src/worker/dossier/invalidation.ts) — invalidazione selettiva lungo il grafo delle dipendenze
@@ -58,9 +59,9 @@ Le fondamenta comuni (Tranche 2) non vivono solo come prosa. Lo
 - [`src/worker/dossier/assignment.ts`](../../src/worker/dossier/assignment.ts) — regola deterministica di assegnazione fra agente 4 e agente 5
 
 ```bash
-npm test        # 536 test su node:sqlite, nessuna dipendenza aggiuntiva (Node 22)
+npm test        # 544 test su node:sqlite, nessuna dipendenza aggiuntiva (Node 22)
 npm run autotest   # la stessa verifica d'integrazione, su D1 reale nel worker
-npm run coordinatore  # il percorso completo nel runtime: DO + Workflow veri
+npm run coordinatore  # 33 controlli nel runtime: DO, Workflow, D1 e R2 veri
 npx tsc -b      # typecheck
 ```
 

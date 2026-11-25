@@ -46,8 +46,10 @@ prendere decisioni sbagliate.
 | Archivio delle fonti, per cantina | ✅ | [`src/worker/dossier/archive.ts`](../../src/worker/dossier/archive.ts) |
 | Conservazione indirizzata per contenuto e deduplica | ✅ | [`src/worker/dossier/storage.ts`](../../src/worker/dossier/storage.ts) |
 | Segmentazione con offset esatti, classificazione, giudizio di leggibilità | ✅ | [`src/worker/dossier/ingest.ts`](../../src/worker/dossier/ingest.ts) |
-| Adattatore R2 per la porta degli oggetti | ⬜ poche righe, da scrivere | — |
-| Estrazione del testo con citazioni (la metà che richiede il modello) | ⬜ | — |
+| Adattatore R2 per la porta degli oggetti | ✅ **provato con R2 reale** (locale) | [`src/worker/dossier/r2.ts`](../../src/worker/dossier/r2.ts) |
+| Caricamento dei materiali e archivio raggiungibile | ✅ | `index.ts` → `PUT /api/cantina/:id/documenti` |
+| Estrazione delle fonti **testuali** | ✅ non richiede il modello: il contenuto è il testo | `actor.ts` → `ingestDocument` |
+| Estrazione con citazioni da PDF e immagini | ⬜ richiede il modello; il materiale resta `caricato` e l'esito dichiara perché | — |
 | Indicizzazione dei frammenti in Vectorize | ⬜ | — |
 | Agenti 2–5 all'opera su casi di prova reali | ⬜ richiede la prima chiamata reale | — |
 
@@ -82,7 +84,7 @@ Interamente specifica: pilota e rilascio graduale.
 
 ## Cosa i test verificano oggi
 
-536 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
+544 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
 il type stripping nativo esegue i `.ts` direttamente e `node:sqlite` fornisce il
 motore: i test del repository girano sullo stesso SQL e sugli stessi vincoli che
 agiranno su D1, non su un simulacro).
@@ -123,6 +125,8 @@ agiranno su D1, non su un simulacro).
 | **Revisore: tenuta su ingressi ostili** | 1.200 coppie generate da testi vuoti, emoji, 3.000 caratteri, byte nulli e lingue senza lessico: nessuna eccezione, nessun motivo vuoto, esito deterministico. E un testo confrontato **con sé stesso** non produce mai anomalie — qualunque segnalazione lì sarebbe falsa per costruzione |
 | **Serializzazione** | La coda esegue una operazione alla volta nell'ordine di arrivo, su venti concorrenti; un fallimento non blocca la coda e il rifiuto non si propaga alle successive; la sequenza «leggi la versione, scrivi la successiva» non si interfoglia, verificata su quindici operazioni concorrenti senza versioni duplicate |
 | **Coordinatore nel runtime** | 24 controlli su un percorso vero: il Workflow si sospende su `waitForEvent`, un secondo percorso sulla stessa cantina ottiene «occupato» **e dichiara chi la tiene**, le risposte consegnate lo riprendono, si conclude e rilascia la cantina. Le domande aperte riguardano il dato contestato, sono rilasciate e raggruppate; il limite di due cicli è rispettato; una verifica per ciclo |
+| **Archivio con R2 reale** | Un materiale testuale si carica e viene estratto subito; lo stesso contenuto non genera una seconda fonte; un PDF resta `caricato` e **dichiara** che l'estrazione è rinviata al modello; un testo illeggibile non viene segmentato e porta il motivo; un corpo vuoto è respinto |
+| **Adattatore R2** | Una vista su un buffer più grande scrive **solo la propria fetta**: `new Uint8Array(buffer, offset, length)` condivide la memoria, e senza ritaglio R2 scriverebbe il buffer intero — l'impronta del contenuto non corrisponderebbe più, e la deduplica si regge su quella. Verificato che l'impronta resti la stessa dopo andata e ritorno |
 | **Coerenza fra le tabelle** | Ogni chiave con un intervallo ha la stessa unità nell'ontologia e viceversa — una chiave con un intervallo ma senza unità dichiarata farebbe classificare un numero senza sapere in che unità è espresso |
 | **Segmentazione** | Ogni offset è esatto (`page.text.slice(charStart, charEnd) === text`, verificato su ogni frammento); nessun frammento supera il massimo né attraversa una pagina; **ogni carattere non bianco di ogni pagina è coperto**; i frammenti si sovrappongono così che il contesto non si perda al taglio; una parola più lunga della finestra viene tagliata invece di bloccare; un testo di 300 paragrafi termina senza girare a vuoto |
 | **Archivio** | Lo stesso contenuto caricato due volte non genera due fonti **né riscrive l'originale**; lo stesso contenuto in due cantine resta separato, con chiavi d'oggetto distinte; un documento altrui non è raggiungibile per id e registrarvi un'estrazione è un errore; un testo illeggibile **non viene segmentato** e si recupera con una nuova estrazione riuscita; un'associazione incerta resta `proposto` con la sua fiducia; i blocchi passati al modello vengono dall'archivio della cantina, quindi un documento di un'altra cantina non può entrare in una richiesta |
@@ -154,8 +158,14 @@ Perché non c'è ancora nulla da verificare, non perché sia stato trascurato:
   consegnato al produttore è l'elenco dei motivi, marcato
   `[formulazione automatica assente]`: utile a chi collauda, dichiaratamente non
   ciò che un produttore dovrebbe leggere.
-- Nessun binding R2, KV o Vectorize configurato: l'archivio degli originali usa
-  la propria porta e in prova un'implementazione in memoria.
+- **Nessun binding KV o Vectorize** configurato: l'ontologia non si carica da KV
+  e i frammenti non si indicizzano per il recupero semantico. R2 è configurato
+  e provato in locale.
+- **La chiave Claude non è presente.** Per il piano cognitivo serve
+  `ANTHROPIC_API_KEY` come variabile dell'ambiente: i network secret non si
+  possono salvare per gli host Anthropic. In una variabile d'ambiente la chiave
+  è leggibile da chiunque usi l'ambiente e da qualunque comando nelle sue
+  sessioni — è un compromesso da valutare, non un dettaglio.
 - La serializzazione per cantina esiste ed è provata, ma **non sotto carico**:
   la coda è verificata con operazioni concorrenti in un test, e l'attore in un
   percorso reale. Resta da misurare come si comporta con molte richieste

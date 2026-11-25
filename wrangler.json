@@ -44,5 +44,11 @@
 			"binding": "ONBOARDING",
 			"class_name": "OnboardingWorkflow"
 		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "ORIGINALI",
+			"bucket_name": "vinoveritas-originali"
+		}
 	]
 }

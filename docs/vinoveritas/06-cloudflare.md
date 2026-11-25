@@ -51,6 +51,9 @@ che nessun test unitario può:
 | Le domande aperte riguardano il **dato contestato**, non un dato mancante | ✅ |
 | Il limite di due cicli è rispettato | ✅ |
 | La coda dell'attore serializza e si svuota | ✅ |
+| Un materiale si carica su **R2 reale**, e una fonte testuale è estratta subito | ✅ |
+| Lo stesso contenuto non genera una seconda fonte | ✅ |
+| Un PDF resta `caricato` e dichiara che l'estrazione è rinviata al modello | ✅ |
 
 ### Un'insidia di `wrangler dev`
 
@@ -140,5 +143,11 @@ fuori:
 - **La chiave `ANTHROPIC_API_KEY`** resta necessaria per l'estrazione con
   citazioni, la revisione avversariale del significato e la formulazione delle
   domande — e per sostituire le stime di costo con numeri.
+
+  Va in una **variabile dell'ambiente**, non in un network secret: questi non
+  si possono salvare per gli host Anthropic, e nessuno viene aggiunto a una
+  richiesta verso `api.anthropic.com`. Il compromesso da conoscere: in una
+  variabile d'ambiente la chiave è leggibile da chiunque usi l'ambiente e da
+  qualunque comando eseguito nelle sue sessioni.
 - **L'accesso a VinoVeritas** resta il blocco della Tranche 1, a monte di tutto
   il piano di attivazione.

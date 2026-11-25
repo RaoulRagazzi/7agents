@@ -33,6 +33,8 @@ import type { LockStats } from "./dossier/lock.ts";
 import { SerialQueue } from "./dossier/lock.ts";
 import type { ContentPack } from "./dossier/pack.ts";
 import { buildContentPack } from "./dossier/pack.ts";
+import { R2ObjectStore } from "./dossier/r2.ts";
+import type { ObjectStore } from "./dossier/storage.ts";
 import type { CantinaDossier, WriteOutcome } from "./dossier/repository.ts";
 import { openDossier } from "./dossier/repository.ts";
 import { blocksTarget, runDeterministicChecks } from "./dossier/sentinel.ts";
@@ -82,6 +84,18 @@ export interface PackSummary {
 	readonly namespace: string;
 	/** I conteggi di ciò che è stato scartato, e perché. */
 	readonly excluded: ContentPack["excluded"];
+}
+
+export interface IngestReport {
+	readonly status: "nuovo" | "duplicato";
+	readonly documentId: string;
+	readonly sha256: string;
+	readonly classe?: string;
+	readonly daConfermare?: boolean;
+	/** Falso quando l'estrazione è rinviata: il dettaglio dice perché. */
+	readonly estratto: boolean;
+	readonly frammenti: number;
+	readonly dettaglio: string;
 }
 
 export interface OnboardingState {
@@ -414,6 +428,125 @@ export class CantinaActor extends DurableObject<Env> {
 			const dossier = await this.#dossier();
 			return dossier.questions.expire(ttlMs);
 		});
+	}
+
+	// ─── Archivio delle fonti ───────────────────────────────────────────────
+
+	#store(): ObjectStore {
+		return new R2ObjectStore(this.env.ORIGINALI);
+	}
+
+	/**
+	 * Acquisisce un materiale e, se è testuale, lo estrae subito.
+	 *
+	 * La distinzione non è una scorciatoia: per un file di testo il contenuto
+	 * **è** il testo, e passarlo al modello per farselo restituire sarebbe
+	 * spendere per nulla. Un PDF o un'immagine richiedono l'estrazione con le
+	 * citazioni, che richiede il modello: restano in stato `caricato`, e
+	 * l'esito lo dichiara invece di lasciarlo supporre.
+	 */
+	ingestDocument(input: {
+		readonly bytes: Uint8Array;
+		readonly filename: string;
+		readonly mime: string;
+		readonly uploadedBy: string;
+	}): Promise<IngestReport> {
+		return this.#queue.run(async () => {
+			const dossier = await this.#dossier();
+			const esito = await dossier.archive.ingest(this.#store(), input);
+
+			if (esito.status === "duplicato") {
+				return {
+					status: "duplicato" as const,
+					documentId: esito.documentId,
+					sha256: esito.sha256,
+					estratto: false,
+					frammenti: 0,
+					dettaglio: "lo stesso contenuto era già presente",
+				};
+			}
+
+			const testuale = input.mime.startsWith("text/");
+			if (!testuale) {
+				return {
+					status: "nuovo" as const,
+					documentId: esito.documentId,
+					sha256: esito.sha256,
+					classe: esito.proposal.documentClass,
+					daConfermare: esito.needsConfirmation,
+					estratto: false,
+					frammenti: 0,
+					dettaglio:
+						`estrazione rinviata: un ${input.mime} richiede le citazioni, ` +
+						"che richiedono il modello",
+				};
+			}
+
+			const testo = new TextDecoder().decode(input.bytes);
+			const estrazione = await dossier.archive.recordExtraction(esito.documentId, [
+				{ page: 1, text: testo },
+			]);
+
+			return {
+				status: "nuovo" as const,
+				documentId: esito.documentId,
+				sha256: esito.sha256,
+				classe: esito.proposal.documentClass,
+				daConfermare: esito.needsConfirmation,
+				estratto: estrazione.status === "estratto",
+				frammenti: estrazione.chunks,
+				dettaglio:
+					estrazione.status === "estratto"
+						? `${estrazione.chunks} frammenti indicizzabili`
+						: (estrazione.reason ?? "illeggibile"),
+			};
+		});
+	}
+
+	/** I materiali della cantina. Lettura: non passa dalla coda. */
+	async listDocuments(): Promise<
+		{
+			id: string;
+			filename?: string;
+			mime: string;
+			classe?: string;
+			status: string;
+			pages?: number;
+			sizeBytes?: number;
+			illegibleReason?: string;
+		}[]
+	> {
+		const dossier = await this.#dossier();
+		return (await dossier.archive.list()).map((d) => ({
+			id: d.id,
+			filename: d.filename,
+			mime: d.mime,
+			classe: d.documentClass,
+			status: d.status,
+			pages: d.pages,
+			sizeBytes: d.sizeBytes,
+			illegibleReason: d.illegibleReason,
+		}));
+	}
+
+	/**
+	 * I blocchi documento pronti per il modello.
+	 *
+	 * Vengono dall'archivio della cantina, quindi un documento di un'altra
+	 * cantina non può entrare in una richiesta. È il collegamento fra
+	 * l'ingestione e gli agenti, e il motivo per cui l'attore lo espone invece
+	 * di lasciare che il kernel peschi dal database.
+	 */
+	async modelDocuments(
+		documentIds: readonly string[],
+	): Promise<{ documentId: string; title: string; text: string }[]> {
+		const dossier = await this.#dossier();
+		const blocchi = await dossier.archive.asModelDocuments(this.#store(), documentIds);
+		return blocchi.map((b) => ({
+			documentId: b.documentId,
+			title: b.title,
+			text: b.text,
+		}));
 	}
 
 	// ─── Attivazione ────────────────────────────────────────────────────────
