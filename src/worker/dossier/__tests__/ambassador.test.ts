@@ -131,6 +131,65 @@ describe("le domande che non si fanno", () => {
 		assert.deepEqual(out.skipped.map((s) => s.reason), ["dato_dichiarato_non_disponibile"]);
 	});
 
+	test("un'anomalia che CONTESTA il valore presente si chiede comunque", () => {
+		// il difetto che questo test blocca: una gradazione di 125 %vol *è*
+		// approvata nel fascicolo, ed è esattamente ciò di cui va chiesto
+		// conto. Saltarla perché «il dato c'è già» lascerebbe il cancello
+		// chiuso per sempre senza interpellare il produttore — e non
+		// produrrebbe alcun errore visibile
+		const facts: Fact[] = [
+			fact("annata", "w1:2021", "gradazione_alcolica", {
+				state: "approvato",
+				value: { kind: "numero", value: 125, unit: "%vol" },
+			}),
+		];
+		const out = planQuestions(
+			plan({
+				findings: [
+					fnd(annata, "gradazione_alcolica", "bloccante", {
+						code: "VALORE_IMPOSSIBILE",
+						contestaValore: true,
+					}),
+				],
+				facts,
+			}),
+		);
+		assert.equal(out.drafts.length, 1, "la domanda deve partire");
+		assert.deepEqual(out.skipped, []);
+	});
+
+	test("un'anomalia di assenza sullo stesso dato approvato si salta", () => {
+		// la distinzione è l'unica cosa che separa i due casi
+		const facts: Fact[] = [
+			fact("annata", "w1:2021", "gradazione_alcolica", { state: "approvato" }),
+		];
+		const out = planQuestions(
+			plan({
+				findings: [
+					fnd(annata, "gradazione_alcolica", "bloccante", {
+						code: "DATO_ASSENTE",
+						contestaValore: false,
+					}),
+				],
+				facts,
+			}),
+		);
+		assert.deepEqual(out.drafts, []);
+		assert.deepEqual(out.skipped.map((x) => x.reason), ["risposta_gia_nel_fascicolo"]);
+	});
+
+	test("senza il campo si comporta come un'assenza: il difetto precedente", () => {
+		// un'anomalia che non dichiara nulla resta trattata come prima, così il
+		// cambiamento non altera il significato delle righe già scritte
+		const facts: Fact[] = [
+			fact("annata", "w1:2021", "gradazione_alcolica", { state: "approvato" }),
+		];
+		const out = planQuestions(
+			plan({ findings: [fnd(annata, "gradazione_alcolica", "bloccante")], facts }),
+		);
+		assert.deepEqual(out.drafts, []);
+	});
+
 	test("un fatto soltanto proposto NON conta come risposta", () => {
 		// il dato esiste ma non è approvato: la domanda serve ancora
 		const facts: Fact[] = [

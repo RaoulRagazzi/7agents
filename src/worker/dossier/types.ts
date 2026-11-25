@@ -149,6 +149,12 @@ export interface Issue {
 	 */
 	readonly detail?: string;
 	readonly targets: readonly TargetRef[];
+	/**
+	 * Vero quando l'anomalia contesta il valore già presente. Decide se la
+	 * verifica preliminare dell'Ambasciatore può considerare la domanda già
+	 * risposta — vedi `Finding.contestaValore` nella Sentinella.
+	 */
+	readonly contestaValore?: boolean;
 	readonly state: "aperta" | "in_domanda" | "risolta" | "accettata";
 	/** Due cicli senza esito, poi escalation al Coordinatore. */
 	readonly cycle: 1 | 2;

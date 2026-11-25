@@ -21,5 +21,28 @@
 			"database_id": "DA_SOSTITUIRE_PER_IL_REMOTO",
 			"migrations_dir": "migrations"
 		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "CANTINA",
+				"class_name": "CantinaActor"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"CantinaActor"
+			]
+		}
+	],
+	"workflows": [
+		{
+			"name": "vinoveritas-onboarding",
+			"binding": "ONBOARDING",
+			"class_name": "OnboardingWorkflow"
+		}
 	]
 }

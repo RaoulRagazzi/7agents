@@ -19,7 +19,7 @@ prendere decisioni sbagliate.
 
 | Componente | Stato | Dove |
 |---|---|---|
-| Schema del fascicolo (D1) | ✅ quattro migrazioni, **applicate e verificate su D1 reale** (locale) | [`migrations/`](../../migrations/) |
+| Schema del fascicolo (D1) | ✅ cinque migrazioni, **applicate e verificate su D1 reale** (locale) | [`migrations/`](../../migrations/) |
 | Tipi del fascicolo: fatto, ambito, provenienza, anomalia | ✅ | [`src/worker/dossier/types.ts`](../../src/worker/dossier/types.ts) |
 | I dieci agenti come dati, con ambiti e strumenti | ✅ | [`src/worker/dossier/agents.ts`](../../src/worker/dossier/agents.ts) |
 | Funzione di ammissione (ambito, provenienza, chiavi riservate) | ✅ | [`src/worker/dossier/admission.ts`](../../src/worker/dossier/admission.ts) |
@@ -62,7 +62,9 @@ prendere decisioni sbagliate.
 | Ambasciatore: deduplica, raggruppamento, politica di rilascio | ✅ | [`src/worker/dossier/ambassador.ts`](../../src/worker/dossier/ambassador.ts) |
 | Domande: ciclo di vita, secondo ciclo, escalation | ✅ | [`src/worker/dossier/questions.ts`](../../src/worker/dossier/questions.ts) |
 | Ambasciatore: formulazione del testo nella lingua del produttore | ⬜ richiede il modello | — |
-| Coordinatore come Workflow durevole | ⬜ | — |
+| Coordinatore come Workflow durevole | ✅ **provato nel runtime**: si sospende, riprende, rilascia | [`src/worker/coordinator.ts`](../../src/worker/coordinator.ts) |
+| Serializzazione delle scritture per cantina | ✅ | [`src/worker/actor.ts`](../../src/worker/actor.ts), [`lock.ts`](../../src/worker/dossier/lock.ts) |
+| Un solo onboarding per cantina | ✅ un secondo percorso trova la cantina occupata e dice chi la tiene | `actor.ts` → `claim` |
 
 ## Tranche 5 — Multilingue e attivazione
 
@@ -80,7 +82,7 @@ Interamente specifica: pilota e rilascio graduale.
 
 ## Cosa i test verificano oggi
 
-520 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
+536 test, eseguibili con `npm test` (Node 22, nessuna dipendenza aggiuntiva —
 il type stripping nativo esegue i `.ts` direttamente e `node:sqlite` fornisce il
 motore: i test del repository girano sullo stesso SQL e sugli stessi vincoli che
 agiranno su D1, non su un simulacro).
@@ -119,6 +121,8 @@ agiranno su D1, non su un simulacro).
 | **Revisore: la trappola del superlativo** | «Soave Superiore» **non** è una qualità aggiunta. Il lessico delle affermazioni esclude per costruzione le qualificazioni di denominazione (`superiore`, `classico`, `riserva`, `gran`, `selezione`) e i descrittori sensoriali legittimi (`intenso`, `ricco`, `elegante`), verificato da un test; i termini protetti escono dal testo prima della scansione, dal più lungo al più corto |
 | **Revisore: simboli e parole** | `%vol`, `g/l`, `mg/l`, `q/ha`, `°C` sono invarianti e la loro perdita è bloccante; `mesi` → `months` e `m s.l.m.` → `m a.s.l.` sono traduzioni corrette e non producono nulla. Ogni unità invariante dichiarata esiste nell'ontologia, e ogni unità dell'ontologia è classificata in uno dei due gruppi |
 | **Revisore: tenuta su ingressi ostili** | 1.200 coppie generate da testi vuoti, emoji, 3.000 caratteri, byte nulli e lingue senza lessico: nessuna eccezione, nessun motivo vuoto, esito deterministico. E un testo confrontato **con sé stesso** non produce mai anomalie — qualunque segnalazione lì sarebbe falsa per costruzione |
+| **Serializzazione** | La coda esegue una operazione alla volta nell'ordine di arrivo, su venti concorrenti; un fallimento non blocca la coda e il rifiuto non si propaga alle successive; la sequenza «leggi la versione, scrivi la successiva» non si interfoglia, verificata su quindici operazioni concorrenti senza versioni duplicate |
+| **Coordinatore nel runtime** | 24 controlli su un percorso vero: il Workflow si sospende su `waitForEvent`, un secondo percorso sulla stessa cantina ottiene «occupato» **e dichiara chi la tiene**, le risposte consegnate lo riprendono, si conclude e rilascia la cantina. Le domande aperte riguardano il dato contestato, sono rilasciate e raggruppate; il limite di due cicli è rispettato; una verifica per ciclo |
 | **Coerenza fra le tabelle** | Ogni chiave con un intervallo ha la stessa unità nell'ontologia e viceversa — una chiave con un intervallo ma senza unità dichiarata farebbe classificare un numero senza sapere in che unità è espresso |
 | **Segmentazione** | Ogni offset è esatto (`page.text.slice(charStart, charEnd) === text`, verificato su ogni frammento); nessun frammento supera il massimo né attraversa una pagina; **ogni carattere non bianco di ogni pagina è coperto**; i frammenti si sovrappongono così che il contesto non si perda al taglio; una parola più lunga della finestra viene tagliata invece di bloccare; un testo di 300 paragrafi termina senza girare a vuoto |
 | **Archivio** | Lo stesso contenuto caricato due volte non genera due fonti **né riscrive l'originale**; lo stesso contenuto in due cantine resta separato, con chiavi d'oggetto distinte; un documento altrui non è raggiungibile per id e registrarvi un'estrazione è un errore; un testo illeggibile **non viene segmentato** e si recupera con una nuova estrazione riuscita; un'associazione incerta resta `proposto` con la sua fiducia; i blocchi passati al modello vengono dall'archivio della cantina, quindi un documento di un'altra cantina non può entrare in una richiesta |
@@ -138,14 +142,25 @@ Perché non c'è ancora nulla da verificare, non perché sia stato trascurato:
   da verificare sul remoto: latenza, limiti di dimensione del database e di
   durata delle richieste, e il comportamento delle migrazioni su un database
   con dati. Vedi [06 — Ambiente Cloudflare](./06-cloudflare.md).
-- **La rotta `/api/autotest` scrive righe di prova e non va esposta in
-  esercizio.** Va rimossa o chiusa dietro un controllo d'accesso prima del
-  primo rilascio pubblico.
+- **Due rotte scrivono righe di prova e non vanno esposte in esercizio**:
+  `/api/autotest` e `/api/dev/semina`. Vanno rimosse o chiuse dietro un
+  controllo d'accesso prima del primo rilascio pubblico. La seconda esiste
+  perché non c'è ancora l'ingestione dei materiali: senza una via per creare un
+  fascicolo, il percorso del Coordinatore non si potrebbe provare.
+- **Il passo di analisi specialistica non fa nulla.** Gli specialisti che
+  estraggono i dati richiedono il modello: il passo esiste, dichiara la propria
+  assenza e prosegue. Tutto il resto del percorso è completo.
+- **La formulazione del testo delle domande è un segnaposto.** Il testo
+  consegnato al produttore è l'elenco dei motivi, marcato
+  `[formulazione automatica assente]`: utile a chi collauda, dichiaratamente non
+  ciò che un produttore dovrebbe leggere.
 - Nessun binding R2, KV o Vectorize configurato: l'archivio degli originali usa
   la propria porta e in prova un'implementazione in memoria.
-- Nessuna concorrenza reale: la serializzazione delle scritture per cantina è
-  affidata al Durable Object, che non esiste ancora. I test di isolamento
-  provano la separazione dei dati, non l'assenza di corse.
+- La serializzazione per cantina esiste ed è provata, ma **non sotto carico**:
+  la coda è verificata con operazioni concorrenti in un test, e l'attore in un
+  percorso reale. Resta da misurare come si comporta con molte richieste
+  contemporanee sulla stessa cantina, e se la coda diventi un collo di
+  bottiglia.
 - **Nessuna chiamata reale all'API è mai stata eseguita.** L'adattatore è
   scritto e i suoi tipi combaciano con quelli dell'SDK installato — che è una
   verifica reale della forma della richiesta, non una congettura — ma nessuna

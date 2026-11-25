@@ -172,8 +172,18 @@ export function planQuestions(input: PlanInput): QuestionPlan {
 		const key = semanticKey(finding.scope, finding.factKey);
 
 		// 1. la risposta è già nel fascicolo?
+		//
+		// Soltanto per le anomalie di **assenza**. Un'anomalia che contesta il
+		// valore presente non si chiude perché quel valore esiste: è quel
+		// valore il problema. Saltarla qui lascerebbe il cancello chiuso per
+		// sempre senza che al produttore venga chiesto nulla — e un difetto
+		// così non si vede, perché non produce alcun errore.
 		const existingFact = live.get(key);
-		if (existingFact !== undefined && existingFact.state === "approvato") {
+		if (
+			finding.contestaValore !== true &&
+			existingFact !== undefined &&
+			existingFact.state === "approvato"
+		) {
 			skipped.push({
 				issueId: finding.issueId,
 				reason:

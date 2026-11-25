@@ -211,6 +211,7 @@ export class CantinaDossier {
 				state: string;
 				cycle: number;
 				detail: string | null;
+				contesta_valore: number;
 			}>();
 
 		return rows.results.map((r) => ({
@@ -225,6 +226,7 @@ export class CantinaDossier {
 			state: r.state as Issue["state"],
 			cycle: r.cycle as 1 | 2,
 			detail: r.detail ?? undefined,
+			contestaValore: r.contesta_valore === 1,
 		}));
 	}
 
@@ -421,8 +423,9 @@ export class CantinaDossier {
 		await this.#db
 			.prepare(
 				`INSERT INTO issue (id,cantina_id,severity,code,scope_type,scope_ref,fact_key,
-				                    evidence_json,targets_json,state,cycle,created_at,detail)
-				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				                    evidence_json,targets_json,state,cycle,created_at,detail,
+				                    contesta_valore)
+				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			)
 			.bind(
 				id,
@@ -438,6 +441,7 @@ export class CantinaDossier {
 				issue.cycle,
 				this.#clock.now(),
 				issue.detail ?? null,
+				issue.contestaValore === true ? 1 : 0,
 			)
 			.run();
 		return id;
@@ -465,6 +469,7 @@ export class CantinaDossier {
 					evidence: f.evidence,
 					targets: f.targets,
 					detail: f.detail,
+					contestaValore: f.contestaValore,
 					state: "aperta",
 					cycle,
 				}),

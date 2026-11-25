@@ -933,3 +933,64 @@ describe("esattezza dei controlli: i modi di tradire", () => {
 		assert.deepEqual([...conIntervallo].sort(), [...conUnita].sort());
 	});
 });
+
+describe("le anomalie dichiarano se contestano il valore presente", () => {
+	test("ogni anomalia costruita da un fatto esistente contesta il suo valore", () => {
+		// la regola è meccanica: se l'anomalia nasce da un fatto, quel fatto ha
+		// un valore, e l'anomalia parla di quel valore
+		const facts: Fact[] = [
+			f("annata", "w1:2021", "gradazione_alcolica", num(135, "%vol")),
+			f("annata", "w1:2022", "gradazione_alcolica", num(13, "g/l")),
+			f("vino", "w1", "tipologia", txt("frizzante")),
+			f("vino", "w1", "colore", txt("ambrato")),
+			f("sede", "s1", "partita_iva", txt("x"), { visibility: "pubblico" }),
+			f("cantina", "c1", "storia", txt("x"), {
+				state: "approvato",
+				provenance: [PROV_INFERENZA],
+			}),
+		];
+
+		const out = runDeterministicChecks({ facts }, CTX);
+		assert.ok(out.length >= 5);
+		for (const anomalia of out) {
+			assert.equal(
+				anomalia.contestaValore,
+				true,
+				`${anomalia.code} non dichiara di contestare il valore`,
+			);
+		}
+	});
+
+	test("l'anomalia di assenza dichiara di NON contestare", () => {
+		const out = checkControlliSpecifici({
+			facts: [f("vino", "w1", "tipologia", txt("spumante"))],
+		});
+		assert.deepEqual(codes(out), ["CONTROLLO_SPECIFICO_ASSENTE"]);
+		assert.equal(out[0]!.contestaValore, false);
+	});
+
+	test("un vitigno non ammesso contesta l'elenco dei vitigni", () => {
+		const out = checkDenominazioneEVitigni(
+			{
+				facts: [
+					f("vino", "w1", "denominazione", txt("Soave Classico DOC")),
+					f("vino", "w1", "vitigni", list("Garganega", "Nebbiolo")),
+				],
+			},
+			CTX,
+		);
+		assert.deepEqual(codes(out), ["VITIGNO_NON_AMMESSO"]);
+		assert.equal(out[0]!.contestaValore, true);
+	});
+
+	test("una traduzione da riesaminare contesta la traduzione esistente", () => {
+		const target = f("annata", "w1:2021", "gradazione_alcolica", num(13, "%vol"));
+		const out = checkTraduzioni({
+			facts: [target],
+			translations: [
+				{ id: "t1", factId: target.id, lang: "en", sourceVersion: 1, state: "stale" },
+			],
+		});
+		assert.equal(out[0]!.contestaValore, true);
+	});
+});

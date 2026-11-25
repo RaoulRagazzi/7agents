@@ -34,6 +34,7 @@ export const MIGRATION = [
 	"0002_archivio.sql",
 	"0003_anomalie.sql",
 	"0004_domande.sql",
+	"0005_anomalia_contesta_valore.sql",
 ]
 	.map((name) => readFileSync(join(MIGRATIONS_DIR, name), "utf8"))
 	.join("\n");

@@ -36,6 +36,20 @@ export interface Finding {
 	readonly evidence: readonly Provenance[];
 	readonly targets: readonly TargetRef[];
 	readonly detail: string;
+	/**
+	 * Vero quando l'anomalia contesta il valore **già presente**, invece di
+	 * segnalarne l'assenza.
+	 *
+	 * Serve all'Ambasciatore e non è un dettaglio: la sua verifica preliminare
+	 * salta la domanda quando il dato è già approvato nel fascicolo, che è
+	 * giusto per un dato mancante e rovesciato per un dato contestato. Una
+	 * gradazione di 125 %vol *è* approvata, ed è esattamente ciò di cui va
+	 * chiesto conto.
+	 *
+	 * La regola è meccanica: un'anomalia costruita a partire da un fatto
+	 * esistente contesta il valore di quel fatto.
+	 */
+	readonly contestaValore?: boolean;
 }
 
 export interface SentinelContext {
@@ -177,6 +191,10 @@ function find(
 	);
 }
 
+/**
+ * Costruisce un'anomalia **a partire da un fatto esistente**, e quindi marca
+ * `contestaValore`. Le anomalie di assenza non passano da qui.
+ */
 function finding(
 	fact: Fact,
 	severity: IssueSeverity,
@@ -191,6 +209,7 @@ function finding(
 		evidence: fact.provenance,
 		targets: targetsFor(fact.scope),
 		detail,
+		contestaValore: true,
 	};
 }
 
@@ -374,6 +393,7 @@ export function checkDenominazioneEVitigni(
 				detail:
 					`${estranei.join(", ")} non fra i vitigni ammessi da ${known.nome} ` +
 					`(${known.vitigniAmmessi.join(", ")})`,
+				contestaValore: true,
 			});
 		}
 	}
@@ -468,6 +488,8 @@ export function checkControlliSpecifici(input: SentinelInput): Finding[] {
 				evidence: f.provenance,
 				targets: targetsFor(f.scope),
 				detail: `un ${tipologia} richiede ${key}, assente per ${wine}`,
+				// è un'assenza: il dato che manca non ha un valore da contestare
+				contestaValore: false,
 			});
 		}
 	}
@@ -706,6 +728,7 @@ export function checkTraduzioni(input: SentinelInput): Finding[] {
 			evidence: fact?.provenance ?? [],
 			targets: [{ target: "materiali_commerciali" }],
 			detail: `la traduzione ${t.lang} di ${t.factId} è legata alla versione ${t.sourceVersion}, ora superata`,
+			contestaValore: true,
 		});
 	}
 

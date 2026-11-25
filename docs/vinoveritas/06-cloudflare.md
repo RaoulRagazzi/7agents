@@ -8,11 +8,22 @@ account. È il motivo per cui il fascicolo è già verificato contro D1 vero e n
 soltanto contro un surrogato.
 
 ```bash
+npm test               # 536 test su node:sqlite, nessuna dipendenza aggiuntiva
+npm run autotest       # la stessa verifica d'integrazione, su D1 reale nel worker
+npm run coordinatore   # il percorso completo: Durable Object e Workflow veri
 npm run d1:migrate     # applica le migrazioni al D1 locale
-npm run autotest       # esegue la verifica d'integrazione dentro il worker
-npm test               # la stessa suite, su node:sqlite
 npm run d1:reset       # azzera il D1 locale e riapplica le migrazioni
 ```
+
+`autotest` e `coordinatore` applicano le migrazioni da sé. Non è una comodità:
+dimenticarle produceva una cascata di fallimenti che nascondeva la causa unica —
+una colonna mancante — dietro dieci sintomi.
+
+Lo stato locale vive in `.wrangler/state/`, escluso dal repository, **e sparisce
+quando il container viene ricostruito**. Al primo comando in una sessione nuova,
+`npm install` e `npm run d1:migrate` vanno rifatti; `npm test` funziona comunque
+perché usa solo moduli nativi di Node, e questo nasconde il problema fino al
+primo `tsc`.
 
 Lo stato locale vive in `.wrangler/state/` ed è escluso dal repository.
 
@@ -25,6 +36,21 @@ invece che da `BEGIN`, l'applicazione delle chiavi esterne è una scelta della
 piattaforma, e il viaggio dei valori attraverso il confine del binding è codice
 diverso. **Se un esito divergesse fra i due motori, è questa la cosa che lo
 mostrerebbe.**
+
+### Il Coordinatore e l'attore, provati nel runtime
+
+`npm run coordinatore` esegue 24 controlli su un percorso vero, e verifica ciò
+che nessun test unitario può:
+
+| Verifica | Esito |
+|---|---|
+| Il Workflow si sospende su `waitForEvent` | ✅ |
+| Un secondo percorso sulla stessa cantina ottiene «occupato», e dichiara chi la tiene | ✅ |
+| Le risposte consegnate al percorso sospeso lo riprendono | ✅ |
+| Il percorso si conclude e rilascia la cantina | ✅ |
+| Le domande aperte riguardano il **dato contestato**, non un dato mancante | ✅ |
+| Il limite di due cicli è rispettato | ✅ |
+| La coda dell'attore serializza e si svuota | ✅ |
 
 ### Un'insidia di `wrangler dev`
 
@@ -107,8 +133,9 @@ pubblico — è annotato in [STATO.md](./STATO.md).
 
 ## 4. Cosa resta fuori anche con l'account
 
-Un account Cloudflare sblocca il piano di orchestrazione e la persistenza, non
-tutto il resto:
+Il piano di orchestrazione e la persistenza sono ora costruiti e provati in
+locale. Un account remoto aggiunge l'esercizio reale, non le funzioni. Resta
+fuori:
 
 - **La chiave `ANTHROPIC_API_KEY`** resta necessaria per l'estrazione con
   citazioni, la revisione avversariale del significato e la formulazione delle
